@@ -460,6 +460,340 @@ textarea {
   background: #edf3ff;
 }
 
+.tag-template {
+  border-color: #9ec5ff;
+  color: #0b5fff;
+  background: #edf3ff;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Teacher workspace */
+.teacher {
+  animation: rise 0.55s var(--ease) both;
+}
+
+.teacher-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.35rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.teacher-kicker {
+  margin: 0 0 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.teacher-hero h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(2.2rem, 5vw, 3.2rem);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  margin: 0 0 0.45rem;
+}
+
+.teacher-hero p {
+  margin: 0;
+  color: var(--ink-soft);
+  max-width: 28rem;
+}
+
+.teacher-orgbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.65rem;
+}
+
+.teacher-orgbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: min(280px, 100%);
+}
+
+.teacher-orgbar label span,
+.teacher-select span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.teacher-orgbar select,
+.teacher-select select {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b7c91' d='M1 1l5 5 5-5'/%3E%3C/svg%3E")
+    no-repeat right 0.85rem center;
+  padding: 0.7rem 2.2rem 0.7rem 0.85rem;
+  color: var(--ink);
+  min-width: 220px;
+}
+
+.teacher-panel {
+  margin-bottom: 1.25rem;
+  padding: 1.4rem 1.45rem 1.5rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.teacher-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .teacher-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.teacher-dash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.teacher-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 1.75rem 0 1.35rem;
+}
+
+.teacher-chips {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.teacher-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.teacher-chips span {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.teacher-empty {
+  padding: 2rem 0;
+}
+
+.assignment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.assignment-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.assignment-list li:first-child {
+  padding-top: 0.25rem;
+}
+
+.assignment-list li:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Repo picker */
+.repo-picker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.repo-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-2);
+  padding: 0.8rem 0.95rem;
+  cursor: pointer;
+  color: var(--ink);
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.repo-picker-trigger:hover,
+.repo-picker-trigger.is-open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 95, 255, 0.12);
+  background: #fff;
+}
+
+.repo-picker-value {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.repo-picker-placeholder {
+  color: var(--muted);
+}
+
+.repo-picker-chevron {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  margin-top: -0.2rem;
+  transition: transform 0.18s var(--ease);
+}
+
+.repo-picker-trigger.is-open .repo-picker-chevron {
+  transform: rotate(225deg);
+  margin-top: 0.2rem;
+}
+
+.repo-picker-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(11, 21, 38, 0.12);
+  overflow: hidden;
+  animation: inviteIn 0.22s var(--ease) both;
+}
+
+.repo-picker-toolbar {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.9fr) 1.1fr;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.repo-picker-filter select,
+.repo-picker-search,
+.repo-picker-manual input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.65rem 0.75rem;
+  color: var(--ink);
+  outline: none;
+}
+
+.repo-picker-filter select:focus,
+.repo-picker-search:focus,
+.repo-picker-manual input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(11, 95, 255, 0.12);
+}
+
+.repo-picker-list {
+  max-height: 240px;
+  overflow: auto;
+  padding: 0.35rem;
+}
+
+.repo-picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 0;
+  background: transparent;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink);
+}
+
+.repo-picker-option:hover,
+.repo-picker-option.is-selected {
+  background: #edf3ff;
+}
+
+.repo-picker-empty {
+  margin: 0;
+  padding: 1rem 0.85rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.repo-picker-manual {
+  border-top: 1px solid var(--line);
+  padding: 0.75rem;
+  background: var(--paper-2);
+}
+
+.repo-picker-manual label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.repo-picker-manual span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .tag-ok {
   border-color: #abe2b9;
   color: var(--ok);

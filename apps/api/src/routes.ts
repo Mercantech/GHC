@@ -206,6 +206,7 @@ export const routes: FastifyPluginAsync = async (app) => {
       assignmentId: string;
       assignmentTitle: string;
       assignmentSlug: string;
+      templateRepo: string;
       mode: "individual" | "group";
       orgId: string;
       githubOrg: string;
@@ -225,6 +226,7 @@ export const routes: FastifyPluginAsync = async (app) => {
       assignmentId: string;
       assignmentTitle: string;
       assignmentSlug: string;
+      templateRepo: string;
       mode: "individual" | "group";
       orgId: string;
       githubOrg: string;
@@ -269,6 +271,7 @@ export const routes: FastifyPluginAsync = async (app) => {
               assignmentId: assignment.id,
               assignmentTitle: assignment.title,
               assignmentSlug: assignment.slug,
+              templateRepo: assignment.templateRepo,
               mode: "group",
               orgId: org.id,
               githubOrg: org.githubOrg,
@@ -286,6 +289,7 @@ export const routes: FastifyPluginAsync = async (app) => {
               assignmentId: assignment.id,
               assignmentTitle: assignment.title,
               assignmentSlug: assignment.slug,
+              templateRepo: assignment.templateRepo,
               mode: "individual",
               orgId: org.id,
               githubOrg: org.githubOrg,
@@ -308,6 +312,7 @@ export const routes: FastifyPluginAsync = async (app) => {
         assignmentId: row.assignmentId,
         assignmentTitle: row.assignmentTitle,
         assignmentSlug: row.assignmentSlug,
+        templateRepo: row.templateRepo,
         mode: row.mode,
         orgId: row.orgId,
         githubOrg: row.githubOrg,
