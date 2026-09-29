@@ -444,12 +444,19 @@ export function TeacherPage({ me }: { me: Me | null }) {
                               </a>
                               {r.error && <div className="dash-error">{r.error}</div>}
                             </td>
-                            <td>
-                              <div className="dash-title">{r.assignmentTitle}</div>
-                              <div className="muted mono" style={{ fontSize: "0.78rem" }}>
-                                {r.templateRepo}
-                              </div>
-                            </td>
+                        <td>
+                          <div className="dash-title">
+                            <Link
+                              className="asg-title-link"
+                              to={`/teacher/assignments/${r.assignmentId}`}
+                            >
+                              {r.assignmentTitle}
+                            </Link>
+                          </div>
+                          <div className="muted mono" style={{ fontSize: "0.78rem" }}>
+                            {r.templateRepo}
+                          </div>
+                        </td>
                             <td>
                               {r.groupName ? (
                                 <>
@@ -677,7 +684,9 @@ export function TeacherPage({ me }: { me: Me | null }) {
                           <li key={a.id}>
                             <div className="assignment-main">
                               <div className="row" style={{ gap: "0.5rem", marginBottom: "0.25rem" }}>
-                                <span className="list-title">{a.title}</span>
+                                <Link className="list-title asg-title-link" to={`/teacher/assignments/${a.id}`}>
+                                  {a.title}
+                                </Link>
                                 <span className={`tag tag-${a.mode}`}>
                                   {a.mode === "group" ? "Gruppe" : "Individuel"}
                                 </span>
@@ -693,14 +702,19 @@ export function TeacherPage({ me }: { me: Me | null }) {
                                 </code>
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => void copyInvite(a.slug, a.id)}
-                            >
-                              <CopyIcon />
-                              {copied === a.id ? "Kopieret" : "Kopiér"}
-                            </button>
+                            <div className="my-repo-actions">
+                              <Link className="btn btn-sm" to={`/teacher/assignments/${a.id}`}>
+                                Dashboard
+                              </Link>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => void copyInvite(a.slug, a.id)}
+                              >
+                                <CopyIcon />
+                                {copied === a.id ? "Kopieret" : "Kopiér"}
+                              </button>
+                            </div>
                           </li>
                         );
                       })}

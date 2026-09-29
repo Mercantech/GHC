@@ -480,6 +480,52 @@ export const routes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  app.get("/assignments/manage/:id", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { id } = request.params as { id: string };
+    const assignment = await prisma.assignment.findFirst({
+      where: { id, org: { createdBySub: request.user!.sub } },
+      include: {
+        org: { select: { id: true, name: true, githubOrg: true } },
+        _count: { select: { enrollments: true, groups: true } },
+        enrollments: {
+          where: { status: "active" },
+          include: {
+            user: { select: { githubLogin: true, name: true, email: true } },
+            group: { select: { id: true, name: true } },
+          },
+          orderBy: { updatedAt: "desc" },
+        },
+      },
+    });
+    if (!assignment) return reply.code(404).send({ error: "Assignment not found" });
+
+    return {
+      assignment: {
+        id: assignment.id,
+        title: assignment.title,
+        slug: assignment.slug,
+        mode: assignment.mode,
+        templateRepo: assignment.templateRepo,
+        inviteToken: assignment.inviteToken,
+        maxTeamSize: assignment.maxTeamSize,
+        enforceRoster: assignment.enforceRoster,
+        enrollmentCount: assignment._count.enrollments,
+        groupCount: assignment._count.groups,
+        org: assignment.org,
+        createdAt: assignment.createdAt,
+        enrollments: assignment.enrollments.map((e) => ({
+          id: e.id,
+          status: e.status,
+          githubRepoFullName: e.githubRepoFullName,
+          acceptedAt: e.updatedAt,
+          student: e.user.githubLogin ?? e.user.name ?? e.user.email ?? "ukendt",
+          groupName: e.group?.name ?? null,
+        })),
+      },
+    };
+  });
+
   app.post("/assignments", async (request, reply) => {
     if (!(await requireTeacher(request, reply))) return;
     const body = z

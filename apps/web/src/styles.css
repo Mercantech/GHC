@@ -642,6 +642,111 @@ textarea {
   padding-bottom: 0;
 }
 
+.asg-title-link {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.asg-title-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.asg-dash-nav {
+  margin-bottom: 1rem;
+}
+
+.asg-back {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.asg-back:hover {
+  color: var(--accent);
+}
+
+.asg-hero {
+  align-items: flex-start;
+}
+
+.asg-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.asg-hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+  max-width: min(420px, 100%);
+}
+
+.asg-invite-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  width: 100%;
+}
+
+.asg-invite-box span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.asg-invite-box code {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.asg-summary {
+  margin-bottom: 1.25rem;
+}
+
+.asg-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  color: var(--ink-soft);
+}
+
+.asg-stat strong {
+  font-family: var(--display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.asg-stat span {
+  font-size: 0.82rem;
+}
+
+@media (max-width: 720px) {
+  .asg-hero-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+}
+
 /* Repo picker */
 .repo-picker {
   position: relative;
