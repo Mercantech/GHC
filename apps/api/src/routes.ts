@@ -19,6 +19,7 @@ import {
   parseRepoFullName,
   parseTemplateRepo,
   slugifyRepoName,
+  studentCommitsSinceStart,
 } from "./github.js";
 import { matchesRoster, parseRosterText } from "./roster.js";
 import { requireTeacher } from "./plugins/auth.js";
@@ -281,16 +282,17 @@ export const routes: FastifyPluginAsync = async (app) => {
       try {
         const { owner, repo } = parseRepoFullName(row.fullName);
         const ghRepo = await getRepo(row.token, owner, repo);
-        // Commits after GitHub repo creation ≈ elev-arbejde (template-commits har ældre dates).
+        // Commits efter repo-oprettelse; accept/initial commit filtreres fra.
         const sinceIso = ghRepo.created_at ?? row.startedAt.toISOString();
         const [latest, commits] = await Promise.all([
           getLatestCommit(row.token, owner, repo),
           listCommitsSince(row.token, owner, repo, sinceIso),
         ]);
 
+        const studentCommits = studentCommitsSinceStart(commits, ghRepo.created_at);
         base.htmlUrl = ghRepo.html_url;
-        base.commitsSinceStart = commits.length;
-        base.hasCommitsSinceStart = commits.length > 0;
+        base.commitsSinceStart = studentCommits.length;
+        base.hasCommitsSinceStart = studentCommits.length > 0;
 
         if (latest) {
           base.lastCommitAt =

@@ -236,6 +236,29 @@ export function parseRepoFullName(fullName: string): { owner: string; repo: stri
   return { owner: parts[0], repo: parts[1] };
 }
 
+/** Accept/template bootstrap — tæller ikke som elev-aktivitet. */
+const BOOTSTRAP_COMMIT_RE = /^(initial commit|create .* from .*template|first commit)\b/i;
+const BOOTSTRAP_WINDOW_MS = 2 * 60 * 1000;
+
+export function isBootstrapCommit(commit: GitHubCommit, repoCreatedAt?: string | null): boolean {
+  const subject = (commit.commit.message.split("\n")[0] ?? "").trim();
+  if (BOOTSTRAP_COMMIT_RE.test(subject)) return true;
+  if (!repoCreatedAt) return false;
+  const created = new Date(repoCreatedAt).getTime();
+  if (Number.isNaN(created)) return false;
+  const dateRaw = commit.commit.committer?.date ?? commit.commit.author?.date;
+  if (!dateRaw) return false;
+  const commitTime = new Date(dateRaw).getTime();
+  return Math.abs(commitTime - created) <= BOOTSTRAP_WINDOW_MS;
+}
+
+export function studentCommitsSinceStart(
+  commits: GitHubCommit[],
+  repoCreatedAt?: string | null,
+): GitHubCommit[] {
+  return commits.filter((c) => !isBootstrapCommit(c, repoCreatedAt));
+}
+
 export function slugifyRepoName(input: string): string {
   return input
     .toLowerCase()
