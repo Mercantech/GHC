@@ -221,7 +221,7 @@ export function TeacherPage({ me }: { me: Me | null }) {
           orgId: selectedOrg,
           rosterId: rosterId || null,
           title,
-          slug: inviteSlug.trim() || undefined,
+          slug: effectiveSlug || undefined,
           templateRepo,
           mode,
           maxTeamSize: maxTeamSize ? Number(maxTeamSize) : null,
@@ -257,6 +257,9 @@ export function TeacherPage({ me }: { me: Me | null }) {
     if (templateFilter !== "all" && r.templateRepo !== templateFilter) return false;
     return true;
   });
+
+  const derivedSlug = slugifyInvite(title);
+  const effectiveSlug = slugTouched ? inviteSlug : derivedSlug;
 
   return (
     <RequireTeacher me={me}>
@@ -506,39 +509,56 @@ export function TeacherPage({ me }: { me: Me | null }) {
                     <Field label="Titel">
                       <input
                         value={title}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          setTitle(next);
-                          if (!slugTouched) setInviteSlug(slugifyInvite(next));
-                        }}
+                        onChange={(e) => setTitle(e.target.value)}
                         placeholder="Opgave 1 — Intro til Git"
                         required
                       />
                     </Field>
                     <Field
                       label="Invite-link"
-                      hint="custom URL-slug"
+                      hint={slugTouched ? "tilpasset" : "auto fra titel"}
                       prefix={<span className="invite-prefix">/a/</span>}
                     >
                       <input
-                        value={inviteSlug}
+                        value={effectiveSlug}
                         onChange={(e) => {
+                          const next = slugifyInvite(e.target.value);
+                          if (!next) {
+                            setSlugTouched(false);
+                            setInviteSlug("");
+                            return;
+                          }
                           setSlugTouched(true);
-                          setInviteSlug(slugifyInvite(e.target.value));
+                          setInviteSlug(next);
                         }}
                         placeholder="opgave-1-intro"
                         pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
                         title="Kun små bogstaver, tal og bindestreger"
-                        required
                         spellCheck={false}
                         autoComplete="off"
                       />
                     </Field>
-                    {inviteSlug && (
-                      <p className="invite-preview mono">
-                        {webOrigin}/a/{inviteSlug}
-                      </p>
-                    )}
+                    <div className="invite-slug-row">
+                      {effectiveSlug ? (
+                        <p className="invite-preview mono">
+                          {webOrigin}/a/{effectiveSlug}
+                        </p>
+                      ) : (
+                        <p className="invite-preview muted">Skriv en titel for at få et invite-link</p>
+                      )}
+                      {slugTouched && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            setSlugTouched(false);
+                            setInviteSlug("");
+                          }}
+                        >
+                          Brug titel
+                        </button>
+                      )}
+                    </div>
 
                     <RepoPicker
                       repos={repos}

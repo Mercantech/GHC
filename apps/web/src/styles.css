@@ -946,6 +946,19 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.invite-slug-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: -0.35rem;
+}
+
+.invite-slug-row .invite-preview {
+  margin: 0;
+}
+
 /* Invite accept — full-viewport premium flow */
 .invite {
   min-height: 100vh;
