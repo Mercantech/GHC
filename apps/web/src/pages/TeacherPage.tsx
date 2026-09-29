@@ -104,11 +104,13 @@ export function TeacherPage({ me }: { me: Me | null }) {
   const [inviteSlug, setInviteSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [templateRepo, setTemplateRepo] = useState("");
+  const [templateSourceOrgId, setTemplateSourceOrgId] = useState("");
   const [mode, setMode] = useState<"individual" | "group">("individual");
   const [rosterId, setRosterId] = useState("");
   const [maxTeamSize, setMaxTeamSize] = useState("");
 
   const activeOrg = orgs.find((o) => o.id === selectedOrg) ?? null;
+  const templateSourceOrg = orgs.find((o) => o.id === templateSourceOrgId) ?? null;
 
   const templateOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -167,23 +169,39 @@ export function TeacherPage({ me }: { me: Me | null }) {
     const org = orgs.find((o) => o.id === selectedOrg);
     if (org) setEditOrgName(org.name);
     setEditOrgToken("");
+    setTemplateSourceOrgId((prev) => {
+      if (prev && orgs.some((o) => o.id === prev)) return prev;
+      return selectedOrg;
+    });
+    void (async () => {
+      try {
+        const r = await api<{ rosters: Roster[] }>(`/orgs/${selectedOrg}/rosters`);
+        setRosters(r.rosters);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Kunne ikke hente rosters");
+      }
+    })();
+    void loadDashboard(selectedOrg);
+  }, [selectedOrg, orgs]);
+
+  useEffect(() => {
+    if (!templateSourceOrgId) {
+      setRepos([]);
+      return;
+    }
     void (async () => {
       setReposLoading(true);
       try {
-        const [r, reposRes] = await Promise.all([
-          api<{ rosters: Roster[] }>(`/orgs/${selectedOrg}/rosters`),
-          api<{ repos: Repo[] }>(`/orgs/${selectedOrg}/repos`),
-        ]);
-        setRosters(r.rosters);
+        const reposRes = await api<{ repos: Repo[] }>(`/orgs/${templateSourceOrgId}/repos`);
         setRepos(reposRes.repos);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Kunne ikke hente org-data");
+        setError(e instanceof Error ? e.message : "Kunne ikke hente template-repos");
+        setRepos([]);
       } finally {
         setReposLoading(false);
       }
     })();
-    void loadDashboard(selectedOrg);
-  }, [selectedOrg]);
+  }, [templateSourceOrgId]);
 
   async function createOrg(e: FormEvent) {
     e.preventDefault();
@@ -656,7 +674,10 @@ export function TeacherPage({ me }: { me: Me | null }) {
                   <div className="section-head">
                     <div>
                       <h2>Ny assignment</h2>
-                      <p>Offentlige repos fra template i org’en.</p>
+                      <p>
+                        Template kan komme fra én org — elev-repos oprettes i{" "}
+                        <strong>@{activeOrg.githubOrg}</strong>.
+                      </p>
                     </div>
                   </div>
                   <form className="stack" onSubmit={(e) => void createAssignment(e)}>
@@ -714,24 +735,70 @@ export function TeacherPage({ me }: { me: Me | null }) {
                       )}
                     </div>
 
+                    <div className="asg-flow-note" role="note">
+                      <div>
+                        <span className="asg-flow-label">Elev-repos</span>
+                        <strong className="mono">@{activeOrg.githubOrg}</strong>
+                      </div>
+                      <span className="asg-flow-arrow" aria-hidden="true">
+                        ←
+                      </span>
+                      <div>
+                        <span className="asg-flow-label">Template fra</span>
+                        <strong className="mono">
+                          @{templateSourceOrg?.githubOrg ?? "…"}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <Field
+                      label="Template-org"
+                      hint={
+                        orgs.length < 2
+                          ? "tilknyt flere org’er under Setup for at browse på tværs"
+                          : "browse templates herfra — repos lander stadig i classroom-org"
+                      }
+                    >
+                      <select
+                        value={templateSourceOrgId}
+                        onChange={(e) => {
+                          setTemplateSourceOrgId(e.target.value);
+                          setTemplateRepo("");
+                        }}
+                      >
+                        {orgs.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name} (@{o.githubOrg})
+                            {o.id === selectedOrg ? " — classroom" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+
                     <RepoPicker
                       repos={repos}
                       value={templateRepo}
                       onChange={setTemplateRepo}
+                      label="Template"
+                      hint="owner/repo — gerne fra en anden org end elev-repos"
                       placeholder={
                         reposLoading
-                          ? "Henter alle repos fra org…"
-                          : "Vælg template eller repo…"
+                          ? "Henter repos fra template-org…"
+                          : "Vælg template eller skriv owner/repo…"
                       }
                     />
                     {reposLoading ? (
                       <p className="muted" style={{ margin: "-0.35rem 0 0", fontSize: "0.85rem" }}>
-                        Henter alle org-repos (kan tage et øjeblik ved 400+)…
+                        Henter repos fra @{templateSourceOrg?.githubOrg}…
                       </p>
                     ) : (
                       <p className="muted" style={{ margin: "-0.35rem 0 0", fontSize: "0.85rem" }}>
-                        {repos.length} repos hentet · {repos.filter((r) => r.isTemplate).length}{" "}
-                        templates
+                        {repos.length} repos · {repos.filter((r) => r.isTemplate).length} templates
+                        {templateSourceOrg &&
+                        activeOrg &&
+                        templateSourceOrg.id !== activeOrg.id
+                          ? ` · genereres ind i @${activeOrg.githubOrg}`
+                          : ""}
                       </p>
                     )}
 

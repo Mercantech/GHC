@@ -230,7 +230,15 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                     <span className={`tag tag-${assignment.mode}`}>
                       {assignment.mode === "group" ? "Gruppe" : "Individuel"}
                     </span>
-                    <span className="mono muted">{assignment.templateRepo}</span>
+                    <span className="mono muted" title="Template">
+                      {assignment.templateRepo}
+                    </span>
+                    <span className="muted" aria-hidden="true">
+                      →
+                    </span>
+                    <span className="mono muted" title="Elev-repos">
+                      @{assignment.org.githubOrg}
+                    </span>
                   </div>
                 </div>
                 <div className="asg-hero-actions">
@@ -300,14 +308,19 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                         spellCheck={false}
                       />
                     </Field>
-                    <Field label="Template-repo" hint="owner/repo">
+                    <Field label="Template-repo" hint="owner/repo — kan være fra en anden org end elev-repos">
                       <input
                         value={editTemplate}
                         onChange={(e) => setEditTemplate(e.target.value)}
                         required
                         spellCheck={false}
+                        placeholder="Mercantech/mit-template"
                       />
                     </Field>
+                    <p className="muted" style={{ margin: "-0.35rem 0 0", fontSize: "0.85rem" }}>
+                      Elev-repos oprettes i <span className="mono">@{assignment.org.githubOrg}</span>.
+                      Classroom-org PAT skal have læseadgang til template’et.
+                    </p>
                     <button className="btn" type="submit" disabled={saving}>
                       {saving ? "Gemmer…" : "Gem ændringer"}
                     </button>

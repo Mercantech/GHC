@@ -14,11 +14,15 @@ export function RepoPicker({
   value,
   onChange,
   placeholder = "Vælg template…",
+  label = "Template-repo",
+  hint = "fra org’en eller frit owner/repo",
 }: {
   repos: PickerRepo[];
   value: string;
   onChange: (fullName: string) => void;
   placeholder?: string;
+  label?: string;
+  hint?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<KindFilter>("template");
@@ -56,8 +60,8 @@ export function RepoPicker({
   return (
     <div className="repo-picker" ref={rootRef}>
       <span className="field-label">
-        Template-repo
-        <span className="field-hint">fra org’en eller frit owner/repo</span>
+        {label}
+        <span className="field-hint">{hint}</span>
       </span>
 
       <button

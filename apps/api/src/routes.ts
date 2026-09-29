@@ -687,6 +687,17 @@ export const routes: FastifyPluginAsync = async (app) => {
       } catch {
         return reply.code(400).send({ error: "templateRepo must be owner/repo" });
       }
+      try {
+        const org = await prisma.org.findUniqueOrThrow({ where: { id: assignment.orgId } });
+        const { owner, repo } = parseTemplateRepo(body.templateRepo);
+        await getRepo(decryptSecret(org.tokenEncrypted), owner, repo);
+      } catch (err) {
+        const msg =
+          err instanceof GitHubError
+            ? `Classroom-org PAT kan ikke læse template “${body.templateRepo}”: ${err.message}`
+            : `Kunne ikke tilgå template “${body.templateRepo}”`;
+        return reply.code(400).send({ error: msg });
+      }
     }
 
     if (body.rosterId) {
@@ -757,6 +768,19 @@ export const routes: FastifyPluginAsync = async (app) => {
       parseTemplateRepo(body.templateRepo);
     } catch {
       return reply.code(400).send({ error: "templateRepo must be owner/repo" });
+    }
+
+    // PAT for classroom-org skal kunne læse template (også på tværs af org’er)
+    try {
+      const { owner, repo } = parseTemplateRepo(body.templateRepo);
+      const token = decryptSecret(org.tokenEncrypted);
+      await getRepo(token, owner, repo);
+    } catch (err) {
+      const msg =
+        err instanceof GitHubError
+          ? `Classroom-org PAT kan ikke læse template “${body.templateRepo}”: ${err.message}. Giv PAT’en læseadgang til template-org’en (fx Mercantech), eller vælg en anden template.`
+          : `Kunne ikke tilgå template “${body.templateRepo}” med classroom-org PAT`;
+      return reply.code(400).send({ error: msg });
     }
 
     if (body.rosterId) {
