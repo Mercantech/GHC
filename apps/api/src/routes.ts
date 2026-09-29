@@ -465,11 +465,24 @@ export const routes: FastifyPluginAsync = async (app) => {
       if (!roster) return reply.code(400).send({ error: "Roster not found for org" });
     }
 
-    const baseSlug = slugify(body.slug ?? body.title);
-    let slug = baseSlug;
-    let n = 1;
-    while (await prisma.assignment.findUnique({ where: { slug } })) {
-      slug = `${baseSlug}-${n++}`;
+    const requestedSlug = body.slug?.trim();
+    let slug: string;
+    if (requestedSlug) {
+      slug = slugify(requestedSlug);
+      if (!slug) {
+        return reply.code(400).send({ error: "Invite-slug er ugyldig" });
+      }
+      const taken = await prisma.assignment.findUnique({ where: { slug } });
+      if (taken) {
+        return reply.code(409).send({ error: `Invite-linket /a/${slug} er allerede i brug` });
+      }
+    } else {
+      const baseSlug = slugify(body.title);
+      slug = baseSlug || `opgave-${randomBytes(3).toString("hex")}`;
+      let n = 1;
+      while (await prisma.assignment.findUnique({ where: { slug } })) {
+        slug = `${baseSlug}-${n++}`;
+      }
     }
 
     const assignment = await prisma.assignment.create({

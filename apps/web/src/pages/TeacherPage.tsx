@@ -45,6 +45,14 @@ type DashboardSummary = {
 
 const webOrigin = import.meta.env.VITE_WEB_ORIGIN ?? window.location.origin;
 
+function slugifyInvite(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
 function formatRelativeDa(iso: string | null): string {
   if (!iso) return "—";
   const then = new Date(iso).getTime();
@@ -84,6 +92,8 @@ export function TeacherPage({ me }: { me: Me | null }) {
   const [csv, setCsv] = useState("email,github,name\n");
 
   const [title, setTitle] = useState("");
+  const [inviteSlug, setInviteSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [templateRepo, setTemplateRepo] = useState("");
   const [mode, setMode] = useState<"individual" | "group">("individual");
   const [rosterId, setRosterId] = useState("");
@@ -191,6 +201,7 @@ export function TeacherPage({ me }: { me: Me | null }) {
           orgId: selectedOrg,
           rosterId: rosterId || null,
           title,
+          slug: inviteSlug.trim() || undefined,
           templateRepo,
           mode,
           maxTeamSize: maxTeamSize ? Number(maxTeamSize) : null,
@@ -199,8 +210,10 @@ export function TeacherPage({ me }: { me: Me | null }) {
       });
       setInfo(`Assignment oprettet. Del invite-linket nedenfor.`);
       setTitle("");
+      setInviteSlug("");
+      setSlugTouched(false);
       await load();
-      const link = `${webOrigin}/invite/${res.assignment.inviteToken}`;
+      const link = `${webOrigin}/a/${res.assignment.slug}`;
       await navigator.clipboard.writeText(link).catch(() => undefined);
       setCopied(res.assignment.id);
     } catch (err) {
@@ -208,8 +221,8 @@ export function TeacherPage({ me }: { me: Me | null }) {
     }
   }
 
-  async function copyInvite(inviteToken: string, id: string) {
-    const link = `${webOrigin}/invite/${inviteToken}`;
+  async function copyInvite(slug: string, id: string) {
+    const link = `${webOrigin}/a/${slug}`;
     await navigator.clipboard.writeText(link);
     setCopied(id);
   }
@@ -484,11 +497,39 @@ export function TeacherPage({ me }: { me: Me | null }) {
                 <Field label="Titel">
                   <input
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setTitle(next);
+                      if (!slugTouched) setInviteSlug(slugifyInvite(next));
+                    }}
                     placeholder="Opgave 1 — Intro til Git"
                     required
                   />
                 </Field>
+                <Field
+                  label="Invite-link"
+                  hint="custom URL-slug"
+                  prefix={<span className="invite-prefix">/a/</span>}
+                >
+                  <input
+                    value={inviteSlug}
+                    onChange={(e) => {
+                      setSlugTouched(true);
+                      setInviteSlug(slugifyInvite(e.target.value));
+                    }}
+                    placeholder="opgave-1-intro"
+                    pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                    title="Kun små bogstaver, tal og bindestreger"
+                    required
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                </Field>
+                {inviteSlug && (
+                  <p className="invite-preview mono">
+                    {webOrigin}/a/{inviteSlug}
+                  </p>
+                )}
                 <Field
                   label="Template-repo"
                   hint="owner/repo"
@@ -576,7 +617,7 @@ export function TeacherPage({ me }: { me: Me | null }) {
           ) : (
             <ul className="list">
               {assignments.map((a) => {
-                const link = `${webOrigin}/invite/${a.inviteToken}`;
+                const link = `${webOrigin}/a/${a.slug}`;
                 return (
                   <li key={a.id}>
                     <div>
@@ -593,14 +634,14 @@ export function TeacherPage({ me }: { me: Me | null }) {
                       <div className="invite-link">
                         <GitHubMark size={12} />
                         <code>
-                          <Link to={`/invite/${a.inviteToken}`}>{link}</Link>
+                          <Link to={`/a/${a.slug}`}>{link}</Link>
                         </code>
                       </div>
                     </div>
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => void copyInvite(a.inviteToken, a.id)}
+                      onClick={() => void copyInvite(a.slug, a.id)}
                     >
                       <CopyIcon />
                       {copied === a.id ? "Kopieret" : "Kopiér"}
