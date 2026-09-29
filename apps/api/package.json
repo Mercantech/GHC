@@ -1,0 +1,33 @@
+{
+  "name": "@ghc/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/formbody": "^8.0.2",
+    "@prisma/client": "^6.5.0",
+    "fastify": "^5.2.1",
+    "fastify-plugin": "^5.1.0",
+    "jose": "^6.0.10",
+    "tsx": "^4.19.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "prisma": "^6.5.0",
+    "typescript": "^5.8.2"
+  }
+}

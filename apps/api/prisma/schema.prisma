@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  sub          String   @id
+  name         String?
+  email        String?
+  githubLogin  String?  @map("github_login")
+  githubId     String?  @map("github_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  orgs         Org[]
+  enrollments  Enrollment[]
+  rosters      Roster[]
+
+  @@map("users")
+}
+
+/// Seeded/manual list of teachers (by GitHub login or email). Complements JWT roles.
+model TeacherAllowlist {
+  id           String   @id @default(cuid())
+  name         String?
+  githubLogin  String?  @unique @map("github_login")
+  email        String?  @unique
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("teacher_allowlist")
+}
+
+model Org {
+  id              String   @id @default(cuid())
+  name            String
+  githubOrg       String   @map("github_org")
+  tokenEncrypted  String   @map("token_encrypted")
+  createdBySub    String   @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  createdBy    User         @relation(fields: [createdBySub], references: [sub])
+  rosters      Roster[]
+  assignments  Assignment[]
+
+  @@unique([githubOrg])
+  @@map("orgs")
+}
+
+model Roster {
+  id           String   @id @default(cuid())
+  orgId        String   @map("org_id")
+  name         String
+  createdBySub String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  org      Org            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User          @relation(fields: [createdBySub], references: [sub])
+  members  RosterMember[]
+  assignments Assignment[]
+
+  @@map("rosters")
+}
+
+model RosterMember {
+  id           String  @id @default(cuid())
+  rosterId     String  @map("roster_id")
+  email        String?
+  githubLogin  String? @map("github_login")
+  displayName  String? @map("display_name")
+
+  roster Roster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+
+  @@index([rosterId, email])
+  @@index([rosterId, githubLogin])
+  @@map("roster_members")
+}
+
+enum AssignmentMode {
+  individual
+  group
+}
+
+model Assignment {
+  id             String         @id @default(cuid())
+  orgId          String         @map("org_id")
+  rosterId       String?        @map("roster_id")
+  title          String
+  slug           String         @unique
+  templateRepo   String         @map("template_repo")
+  mode           AssignmentMode
+  inviteToken    String         @unique @map("invite_token")
+  maxTeamSize    Int?           @map("max_team_size")
+  enforceRoster  Boolean        @default(true) @map("enforce_roster")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  org         Org          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  roster      Roster?      @relation(fields: [rosterId], references: [id], onDelete: SetNull)
+  groups      Group[]
+  enrollments Enrollment[]
+
+  @@map("assignments")
+}
+
+model Group {
+  id                 String   @id @default(cuid())
+  assignmentId       String   @map("assignment_id")
+  name               String
+  githubTeamSlug     String   @map("github_team_slug")
+  githubRepoFullName String   @map("github_repo_full_name")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  assignment  Assignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  enrollments Enrollment[]
+
+  @@unique([assignmentId, name])
+  @@map("groups")
+}
+
+enum EnrollmentStatus {
+  pending
+  active
+  failed
+}
+
+model Enrollment {
+  id                 String           @id @default(cuid())
+  assignmentId       String           @map("assignment_id")
+  userId             String           @map("user_id")
+  groupId            String?          @map("group_id")
+  githubRepoFullName String?          @map("github_repo_full_name")
+  status             EnrollmentStatus @default(pending)
+  errorMessage       String?          @map("error_message")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [sub], onDelete: Cascade)
+  group      Group?     @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@unique([assignmentId, userId])
+  @@map("enrollments")
+}

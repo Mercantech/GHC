@@ -1,0 +1,28 @@
+# Lokal udvikling: docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+services:
+  web:
+    ports:
+      - "${WEB_PORT:-8080}:3000"
+    build:
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_MERCANTEC_CLIENT_ID: ${MERCANTEC_CLIENT_ID:-ghc}
+        VITE_MERCANTEC_AUTHORIZE_URL: ${MERCANTEC_AUTHORIZE_URL:-https://auth.mercantec.tech/oauth/authorize}
+        VITE_MERCANTEC_TOKEN_URL: ${MERCANTEC_TOKEN_URL:-https://auth.mercantec.tech/oauth/token}
+        VITE_MERCANTEC_SIGNOUT_URL: ${MERCANTEC_SIGNOUT_URL:-https://auth.mercantec.tech/signout}
+        VITE_REDIRECT_URI: ${REDIRECT_URI:-http://localhost:8080/auth/callback}
+        VITE_WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+    environment:
+      # ingen ekstra runtime-env nødvendig; build-args ovenfor gælder ved --build
+      WEB_ORIGIN_HINT: ${WEB_ORIGIN:-http://localhost:8080}
+    labels:
+      - traefik.enable=false
+
+  api:
+    environment:
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+
+networks:
+  dokploy-network:
+    external: false
+    name: ghc-dokploy-local

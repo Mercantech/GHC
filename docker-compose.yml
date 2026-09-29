@@ -1,0 +1,75 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ghc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ghc}
+      POSTGRES_DB: ${POSTGRES_DB:-ghc}
+    volumes:
+      - ghc_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ghc} -d ${POSTGRES_DB:-ghc}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ghc}:${POSTGRES_PASSWORD:-ghc}@db:5432/${POSTGRES_DB:-ghc}
+      MERCANTEC_ISSUER: ${MERCANTEC_ISSUER:-https://auth.mercantec.tech}
+      MERCANTEC_AUDIENCE: ${MERCANTEC_AUDIENCE:-mercantec-apps}
+      MERCANTEC_JWKS_URL: ${MERCANTEC_JWKS_URL:-https://auth.mercantec.tech/.well-known/jwks.json}
+      MERCANTEC_TOKEN_URL: ${MERCANTEC_TOKEN_URL:-https://auth.mercantec.tech/oauth/token}
+      MERCANTEC_CLIENT_ID: ${MERCANTEC_CLIENT_ID:-ghc}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
+      WEB_ORIGIN: ${WEB_ORIGIN:-https://ghc.mercantec.tech}
+      TEACHER_ROLES: ${TEACHER_ROLES:-teacher,admin}
+    networks:
+      - internal
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_MERCANTEC_CLIENT_ID: ${MERCANTEC_CLIENT_ID:-ghc}
+        VITE_MERCANTEC_AUTHORIZE_URL: ${MERCANTEC_AUTHORIZE_URL:-https://auth.mercantec.tech/oauth/authorize}
+        VITE_MERCANTEC_TOKEN_URL: ${MERCANTEC_TOKEN_URL:-https://auth.mercantec.tech/oauth/token}
+        VITE_MERCANTEC_SIGNOUT_URL: ${MERCANTEC_SIGNOUT_URL:-https://auth.mercantec.tech/signout}
+        VITE_REDIRECT_URI: ${REDIRECT_URI:-https://ghc.mercantec.tech/auth/callback}
+        VITE_WEB_ORIGIN: ${WEB_ORIGIN:-https://ghc.mercantec.tech}
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - internal
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.rule=Host(`${TRAEFIK_HOST:-ghc.mercantec.tech}`)
+      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.entrypoints=${TRAEFIK_ENTRYPOINTS:-websecure}
+      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.tls=true
+      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.${TRAEFIK_ROUTER:-ghc}.loadbalancer.server.port=3000
+
+volumes:
+  ghc_pgdata:
+
+networks:
+  internal:
+  dokploy-network:
+    external: true
