@@ -18,6 +18,7 @@ import {
   listOrgRepos,
   parseRepoFullName,
   parseTemplateRepo,
+  repoExists,
   slugifyRepoName,
   studentCommitsSinceStart,
 } from "./github.js";
@@ -159,16 +160,79 @@ export const routes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send({ org });
   });
 
-  app.get("/orgs/:orgId/repos", async (request, reply) => {
+  app.patch("/orgs/:orgId", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { orgId } = request.params as { orgId: string };
+    const body = z
+      .object({
+        name: z.string().min(1).optional(),
+        token: z.string().min(10).optional(),
+      })
+      .parse(request.body);
+
+    const org = await prisma.org.findFirst({
+      where: { id: orgId, createdBySub: request.user!.sub },
+    });
+    if (!org) return reply.code(404).send({ error: "Org not found" });
+
+    if (body.token) {
+      try {
+        await getOrg(body.token, org.githubOrg);
+      } catch (err) {
+        const msg = err instanceof GitHubError ? err.message : "Could not access GitHub org";
+        return reply.code(400).send({ error: msg });
+      }
+    }
+
+    const updated = await prisma.org.update({
+      where: { id: org.id },
+      data: {
+        ...(body.name ? { name: body.name } : {}),
+        ...(body.token ? { tokenEncrypted: encryptSecret(body.token) } : {}),
+      },
+      select: { id: true, name: true, githubOrg: true, createdAt: true },
+    });
+    return { org: updated };
+  });
+
+  app.delete("/orgs/:orgId", async (request, reply) => {
     if (!(await requireTeacher(request, reply))) return;
     const { orgId } = request.params as { orgId: string };
     const org = await prisma.org.findFirst({
       where: { id: orgId, createdBySub: request.user!.sub },
     });
     if (!org) return reply.code(404).send({ error: "Org not found" });
+    await prisma.org.delete({ where: { id: org.id } });
+    return reply.code(204).send();
+  });
+
+  app.get("/orgs/:orgId/repos", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { orgId } = request.params as { orgId: string };
+    const query = z
+      .object({
+        q: z.string().optional(),
+        templatesOnly: z
+          .union([z.literal("1"), z.literal("true"), z.literal("0"), z.literal("false")])
+          .optional(),
+      })
+      .parse(request.query);
+
+    const org = await prisma.org.findFirst({
+      where: { id: orgId, createdBySub: request.user!.sub },
+    });
+    if (!org) return reply.code(404).send({ error: "Org not found" });
 
     const token = decryptSecret(org.tokenEncrypted);
-    const repos = await listOrgRepos(token, org.githubOrg);
+    let repos = await listOrgRepos(token, org.githubOrg);
+    const templatesOnly = query.templatesOnly === "1" || query.templatesOnly === "true";
+    if (templatesOnly) repos = repos.filter((r) => r.is_template);
+    if (query.q?.trim()) {
+      const q = query.q.trim().toLowerCase();
+      repos = repos.filter(
+        (r) => r.full_name.toLowerCase().includes(q) || r.name.toLowerCase().includes(q),
+      );
+    }
     return {
       repos: repos.map((r) => ({
         fullName: r.full_name,
@@ -176,6 +240,7 @@ export const routes: FastifyPluginAsync = async (app) => {
         isTemplate: Boolean(r.is_template),
         htmlUrl: r.html_url,
       })),
+      total: repos.length,
     };
   });
 
@@ -453,6 +518,76 @@ export const routes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.patch("/rosters/:rosterId", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { rosterId } = request.params as { rosterId: string };
+    const body = z
+      .object({
+        name: z.string().min(1).optional(),
+        csv: z.string().min(1).optional(),
+      })
+      .parse(request.body);
+
+    const roster = await prisma.roster.findFirst({
+      where: { id: rosterId, org: { createdBySub: request.user!.sub } },
+    });
+    if (!roster) return reply.code(404).send({ error: "Roster not found" });
+
+    if (body.csv) {
+      const rows = parseRosterText(body.csv);
+      if (rows.length === 0) {
+        return reply.code(400).send({ error: "No valid roster rows found" });
+      }
+      await prisma.$transaction([
+        prisma.rosterMember.deleteMany({ where: { rosterId: roster.id } }),
+        prisma.rosterMember.createMany({
+          data: rows.map((r) => ({
+            rosterId: roster.id,
+            email: r.email?.toLowerCase(),
+            githubLogin: r.githubLogin,
+            displayName: r.displayName,
+          })),
+        }),
+        ...(body.name
+          ? [prisma.roster.update({ where: { id: roster.id }, data: { name: body.name } })]
+          : []),
+      ]);
+    } else if (body.name) {
+      await prisma.roster.update({ where: { id: roster.id }, data: { name: body.name } });
+    }
+
+    const updated = await prisma.roster.findUniqueOrThrow({
+      where: { id: roster.id },
+      include: { _count: { select: { members: true } } },
+    });
+    return {
+      roster: {
+        id: updated.id,
+        name: updated.name,
+        memberCount: updated._count.members,
+      },
+    };
+  });
+
+  app.delete("/rosters/:rosterId", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { rosterId } = request.params as { rosterId: string };
+    const roster = await prisma.roster.findFirst({
+      where: { id: rosterId, org: { createdBySub: request.user!.sub } },
+      include: { _count: { select: { assignments: true } } },
+    });
+    if (!roster) return reply.code(404).send({ error: "Roster not found" });
+    if (roster._count.assignments > 0) {
+      // Detach assignments first then delete
+      await prisma.assignment.updateMany({
+        where: { rosterId: roster.id },
+        data: { rosterId: null, enforceRoster: false },
+      });
+    }
+    await prisma.roster.delete({ where: { id: roster.id } });
+    return reply.code(204).send();
+  });
+
   // --- Assignments ---
   app.get("/assignments", async (request, reply) => {
     if (!(await requireTeacher(request, reply))) return;
@@ -489,7 +624,6 @@ export const routes: FastifyPluginAsync = async (app) => {
         org: { select: { id: true, name: true, githubOrg: true } },
         _count: { select: { enrollments: true, groups: true } },
         enrollments: {
-          where: { status: "active" },
           include: {
             user: { select: { githubLogin: true, name: true, email: true } },
             group: { select: { id: true, name: true } },
@@ -510,6 +644,7 @@ export const routes: FastifyPluginAsync = async (app) => {
         inviteToken: assignment.inviteToken,
         maxTeamSize: assignment.maxTeamSize,
         enforceRoster: assignment.enforceRoster,
+        rosterId: assignment.rosterId,
         enrollmentCount: assignment._count.enrollments,
         groupCount: assignment._count.groups,
         org: assignment.org,
@@ -517,6 +652,7 @@ export const routes: FastifyPluginAsync = async (app) => {
         enrollments: assignment.enrollments.map((e) => ({
           id: e.id,
           status: e.status,
+          errorMessage: e.errorMessage,
           githubRepoFullName: e.githubRepoFullName,
           acceptedAt: e.updatedAt,
           student: e.user.githubLogin ?? e.user.name ?? e.user.email ?? "ukendt",
@@ -524,6 +660,77 @@ export const routes: FastifyPluginAsync = async (app) => {
         })),
       },
     };
+  });
+
+  app.patch("/assignments/manage/:id", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { id } = request.params as { id: string };
+    const body = z
+      .object({
+        title: z.string().min(1).optional(),
+        slug: z.string().min(1).optional(),
+        templateRepo: z.string().min(3).optional(),
+        maxTeamSize: z.number().int().positive().nullable().optional(),
+        enforceRoster: z.boolean().optional(),
+        rosterId: z.string().nullable().optional(),
+      })
+      .parse(request.body);
+
+    const assignment = await prisma.assignment.findFirst({
+      where: { id, org: { createdBySub: request.user!.sub } },
+    });
+    if (!assignment) return reply.code(404).send({ error: "Assignment not found" });
+
+    if (body.templateRepo) {
+      try {
+        parseTemplateRepo(body.templateRepo);
+      } catch {
+        return reply.code(400).send({ error: "templateRepo must be owner/repo" });
+      }
+    }
+
+    if (body.rosterId) {
+      const roster = await prisma.roster.findFirst({
+        where: { id: body.rosterId, orgId: assignment.orgId },
+      });
+      if (!roster) return reply.code(400).send({ error: "Roster not found for org" });
+    }
+
+    let slug = assignment.slug;
+    if (body.slug !== undefined) {
+      slug = slugify(body.slug);
+      if (!slug) return reply.code(400).send({ error: "Invite-slug er ugyldig" });
+      const taken = await prisma.assignment.findFirst({
+        where: { slug, NOT: { id: assignment.id } },
+      });
+      if (taken) {
+        return reply.code(409).send({ error: `Invite-linket /a/${slug} er allerede i brug` });
+      }
+    }
+
+    const updated = await prisma.assignment.update({
+      where: { id: assignment.id },
+      data: {
+        ...(body.title ? { title: body.title } : {}),
+        ...(body.slug !== undefined ? { slug } : {}),
+        ...(body.templateRepo ? { templateRepo: body.templateRepo } : {}),
+        ...(body.maxTeamSize !== undefined ? { maxTeamSize: body.maxTeamSize } : {}),
+        ...(body.enforceRoster !== undefined ? { enforceRoster: body.enforceRoster } : {}),
+        ...(body.rosterId !== undefined ? { rosterId: body.rosterId } : {}),
+      },
+    });
+    return { assignment: updated };
+  });
+
+  app.delete("/assignments/manage/:id", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { id } = request.params as { id: string };
+    const assignment = await prisma.assignment.findFirst({
+      where: { id, org: { createdBySub: request.user!.sub } },
+    });
+    if (!assignment) return reply.code(404).send({ error: "Assignment not found" });
+    await prisma.assignment.delete({ where: { id: assignment.id } });
+    return reply.code(204).send();
   });
 
   app.post("/assignments", async (request, reply) => {
@@ -767,12 +974,15 @@ export const routes: FastifyPluginAsync = async (app) => {
     });
 
     try {
-      const ghRepo = await generateFromTemplate(token, owner, templateName, {
-        owner: org.githubOrg,
-        name: repoName,
-        private: false,
-        description: `${assignment.title} — ${user.githubLogin}`,
-      });
+      const existingRepo = await repoExists(token, org.githubOrg, repoName);
+      const ghRepo =
+        existingRepo ??
+        (await generateFromTemplate(token, owner, templateName, {
+          owner: org.githubOrg,
+          name: repoName,
+          private: false,
+          description: `${assignment.title} — ${user.githubLogin}`,
+        }));
       await addCollaborator(token, org.githubOrg, repoName, user.githubLogin!, "push");
 
       const updated = await prisma.enrollment.update({
@@ -786,6 +996,97 @@ export const routes: FastifyPluginAsync = async (app) => {
       return { enrollment: updated };
     } catch (err) {
       const msg = err instanceof GitHubError ? err.message : "Failed to create repo";
+      // Hvis template-generate fejlede fordi navnet findes, prøv collaborator alligevel
+      if (err instanceof GitHubError && /already exists|name already exists/i.test(msg)) {
+        try {
+          const existingRepo = await getRepo(token, org.githubOrg, repoName);
+          await addCollaborator(token, org.githubOrg, repoName, user.githubLogin!, "push");
+          const updated = await prisma.enrollment.update({
+            where: { id: enrollment.id },
+            data: {
+              status: "active",
+              githubRepoFullName: existingRepo.full_name,
+              errorMessage: null,
+            },
+          });
+          return { enrollment: updated };
+        } catch {
+          // fall through
+        }
+      }
+      const updated = await prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: { status: "failed", errorMessage: msg },
+      });
+      return reply.code(502).send({ error: msg, enrollment: updated });
+    }
+  });
+
+  /** Teacher: genåbn failed enrollment (re-invite collaborator / genopret). */
+  app.post("/enrollments/:enrollmentId/reopen", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+    const { enrollmentId } = request.params as { enrollmentId: string };
+
+    const enrollment = await prisma.enrollment.findFirst({
+      where: {
+        id: enrollmentId,
+        assignment: { org: { createdBySub: request.user!.sub } },
+      },
+      include: {
+        user: true,
+        assignment: true,
+      },
+    });
+    if (!enrollment) return reply.code(404).send({ error: "Enrollment not found" });
+    if (enrollment.assignment.mode !== "individual") {
+      return reply.code(400).send({ error: "Reopen understøttes kun for individuelle assignments" });
+    }
+    if (!enrollment.user.githubLogin) {
+      return reply.code(400).send({ error: "Eleven mangler GitHub-brugernavn" });
+    }
+
+    const org = await prisma.org.findUniqueOrThrow({
+      where: { id: enrollment.assignment.orgId },
+    });
+    const token = decryptSecret(org.tokenEncrypted);
+    const { owner, repo: templateName } = parseTemplateRepo(enrollment.assignment.templateRepo);
+    const repoName = slugifyRepoName(
+      `${enrollment.assignment.slug}-${enrollment.user.githubLogin}`,
+    );
+
+    await prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { status: "pending", errorMessage: null },
+    });
+
+    try {
+      const existingRepo = await repoExists(token, org.githubOrg, repoName);
+      const ghRepo =
+        existingRepo ??
+        (await generateFromTemplate(token, owner, templateName, {
+          owner: org.githubOrg,
+          name: repoName,
+          private: false,
+          description: `${enrollment.assignment.title} — ${enrollment.user.githubLogin}`,
+        }));
+      await addCollaborator(
+        token,
+        org.githubOrg,
+        repoName,
+        enrollment.user.githubLogin,
+        "push",
+      );
+      const updated = await prisma.enrollment.update({
+        where: { id: enrollment.id },
+        data: {
+          status: "active",
+          githubRepoFullName: ghRepo.full_name,
+          errorMessage: null,
+        },
+      });
+      return { enrollment: updated };
+    } catch (err) {
+      const msg = err instanceof GitHubError ? err.message : "Failed to reopen repo";
       const updated = await prisma.enrollment.update({
         where: { id: enrollment.id },
         data: { status: "failed", errorMessage: msg },

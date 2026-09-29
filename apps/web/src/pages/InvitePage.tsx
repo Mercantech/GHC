@@ -116,6 +116,7 @@ function AssignmentView({
   }
 
   const enrolled = data?.enrollment?.status === "active";
+  const failed = data?.enrollment?.status === "failed";
   const repoUrl = data?.enrollment?.githubRepoFullName
     ? `https://github.com/${data.enrollment.githubRepoFullName}`
     : null;
@@ -202,10 +203,11 @@ function AssignmentView({
         <div className="invite-panel invite-panel-busy">
           <div className="invite-spinner" aria-hidden="true" />
           <p className="invite-kicker">Et øjeblik</p>
-          <h1 className="invite-title">Opretter dit repo</h1>
+          <h1 className="invite-title">{failed ? "Genåbner dit repo" : "Opretter dit repo"}</h1>
           <p className="invite-lead">
-            Vi genererer repoet fra template og giver{" "}
-            <span className="mono">@{me.githubLogin}</span> write-adgang.
+            {failed
+              ? `Vi tjekker om repoet findes og giver @${me.githubLogin} write-adgang igen.`
+              : `Vi genererer repoet fra template og giver @${me.githubLogin} write-adgang.`}
           </p>
         </div>
       </div>
@@ -223,12 +225,18 @@ function AssignmentView({
         </div>
         <h1 className="invite-title">{a.title}</h1>
         <p className="invite-lead">
-          {a.mode === "group"
-            ? "Opret en gruppe eller join en eksisterende — I deler ét repo via GitHub Teams."
-            : "Acceptér, så opretter vi et offentligt repo til dig fra template og giver dig write-adgang."}
+          {failed
+            ? "Noget gik galt sidst — prøv igen. Findes repoet allerede, genåbner vi bare din adgang."
+            : a.mode === "group"
+              ? "Opret en gruppe eller join en eksisterende — I deler ét repo via GitHub Teams."
+              : "Acceptér, så opretter vi et offentligt repo til dig fra template og giver dig write-adgang."}
         </p>
 
-        {error && <div className="invite-inline-error">{error}</div>}
+        {(error || (failed && data.enrollment?.errorMessage)) && (
+          <div className="invite-inline-error">
+            {error ?? data.enrollment?.errorMessage}
+          </div>
+        )}
 
         {a.mode === "individual" && (
           <div className="invite-actions">
@@ -238,7 +246,7 @@ function AssignmentView({
               onClick={() => void acceptIndividual()}
             >
               <GitHubMark size={20} />
-              Acceptér opgave
+              {failed ? "Genåbn repo" : "Acceptér opgave"}
             </button>
             <p className="invite-hint">
               Logger ind som <span className="mono">@{me.githubLogin}</span> · {a.templateRepo}

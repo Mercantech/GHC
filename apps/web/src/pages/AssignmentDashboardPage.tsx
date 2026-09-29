@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
-import { Layout, RequireTeacher, type Me } from "../components";
+import { Field, Layout, RequireTeacher, type Me } from "../components";
 import { CopyIcon, GitHubMark } from "../icons";
 
 type AssignmentDetail = {
@@ -19,6 +19,7 @@ type AssignmentDetail = {
   enrollments: Array<{
     id: string;
     status: string;
+    errorMessage: string | null;
     githubRepoFullName: string | null;
     acceptedAt: string;
     student: string;
@@ -53,6 +54,14 @@ type DashboardSummary = {
 
 const webOrigin = import.meta.env.VITE_WEB_ORIGIN ?? window.location.origin;
 
+function slugifyInvite(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
 function formatRelativeDa(iso: string | null): string {
   if (!iso) return "—";
   const then = new Date(iso).getTime();
@@ -69,15 +78,30 @@ function formatRelativeDa(iso: string | null): string {
   return `${months} mdr. siden`;
 }
 
+function statusLabel(status: string): string {
+  if (status === "active") return "Aktiv";
+  if (status === "failed") return "Fejlet";
+  if (status === "pending") return "Afventer";
+  return status;
+}
+
 export function AssignmentDashboardPage({ me }: { me: Me | null }) {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [assignment, setAssignment] = useState<AssignmentDetail | null>(null);
   const [repos, setRepos] = useState<DashboardRepo[]>([]);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "idle">("all");
   const [copied, setCopied] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editTemplate, setEditTemplate] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [reopeningId, setReopeningId] = useState<string | null>(null);
 
   async function load() {
     if (!id) return;
@@ -93,6 +117,9 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
       setAssignment(detail.assignment);
       setRepos(dash.repos);
       setSummary(dash.summary);
+      setEditTitle(detail.assignment.title);
+      setEditSlug(detail.assignment.slug);
+      setEditTemplate(detail.assignment.templateRepo);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Kunne ikke hente assignment");
       setAssignment(null);
@@ -122,6 +149,61 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
     window.setTimeout(() => setCopied(false), 1800);
   }
 
+  async function saveAssignment(e: FormEvent) {
+    e.preventDefault();
+    if (!assignment) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api(`/assignments/manage/${assignment.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          slug: slugifyInvite(editSlug),
+          templateRepo: editTemplate.trim(),
+        }),
+      });
+      setInfo("Assignment opdateret");
+      setEditing(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke gemme");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteAssignment() {
+    if (!assignment) return;
+    const ok = window.confirm(
+      `Slet assignment “${assignment.title}”? Tilmeldinger slettes også (GitHub-repos beholdes).`,
+    );
+    if (!ok) return;
+    setError(null);
+    try {
+      await api(`/assignments/manage/${assignment.id}`, { method: "DELETE" });
+      navigate("/teacher");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke slette");
+    }
+  }
+
+  async function reopenEnrollment(enrollmentId: string) {
+    setReopeningId(enrollmentId);
+    setError(null);
+    setInfo(null);
+    try {
+      await api(`/enrollments/${enrollmentId}/reopen`, { method: "POST" });
+      setInfo("Repo genåbnet — collaborator re-inviteret");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Genåbn fejlede");
+      await load();
+    } finally {
+      setReopeningId(null);
+    }
+  }
+
   return (
     <RequireTeacher me={me}>
       <Layout me={me}>
@@ -134,6 +216,7 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
 
           {loading && <p className="muted">Henter assignment…</p>}
           {error && <div className="error">{error}</div>}
+          {info && <div className="success">{info}</div>}
 
           {assignment && !loading && (
             <>
@@ -165,13 +248,72 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setEditing((v) => !v);
+                        setEditTitle(assignment.title);
+                        setEditSlug(assignment.slug);
+                        setEditTemplate(assignment.templateRepo);
+                      }}
+                    >
+                      {editing ? "Annuller" : "Rediger"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
                       onClick={() => void load()}
                     >
                       Opdater
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger-ghost btn-sm"
+                      onClick={() => void deleteAssignment()}
+                    >
+                      Slet
+                    </button>
                   </div>
                 </div>
               </header>
+
+              {editing && (
+                <section className="teacher-panel">
+                  <div className="section-head">
+                    <div>
+                      <h2>Rediger assignment</h2>
+                      <p>Titel, invite-slug og template. Mode kan ikke ændres.</p>
+                    </div>
+                  </div>
+                  <form className="stack" onSubmit={(e) => void saveAssignment(e)}>
+                    <Field label="Titel">
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        required
+                      />
+                    </Field>
+                    <Field label="Invite-slug" prefix={<span className="invite-prefix">/a/</span>}>
+                      <input
+                        value={editSlug}
+                        onChange={(e) => setEditSlug(slugifyInvite(e.target.value))}
+                        pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                        required
+                        spellCheck={false}
+                      />
+                    </Field>
+                    <Field label="Template-repo" hint="owner/repo">
+                      <input
+                        value={editTemplate}
+                        onChange={(e) => setEditTemplate(e.target.value)}
+                        required
+                        spellCheck={false}
+                      />
+                    </Field>
+                    <button className="btn" type="submit" disabled={saving}>
+                      {saving ? "Gemmer…" : "Gem ændringer"}
+                    </button>
+                  </form>
+                </section>
+              )}
 
               {summary && (
                 <div className="dash-summary asg-summary" role="group" aria-label="Status">
@@ -305,7 +447,10 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                 <div className="section-head">
                   <div>
                     <h2>Tilmeldinger</h2>
-                    <p>Elever der har accepteret via invite-linket.</p>
+                    <p>
+                      Elever der har accepteret via invite-linket. Fejlede invites kan genåbnes
+                      (re-invite collaborator).
+                    </p>
                   </div>
                 </div>
                 {assignment.enrollments.length === 0 ? (
@@ -315,11 +460,29 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                     {assignment.enrollments.map((e) => (
                       <li key={e.id}>
                         <div className="assignment-main">
-                          <div className="list-title mono">@{e.student}</div>
+                          <div className="row" style={{ gap: "0.5rem", marginBottom: "0.25rem" }}>
+                            <div className="list-title mono">@{e.student}</div>
+                            <span
+                              className={`tag ${
+                                e.status === "active"
+                                  ? "tag-ok"
+                                  : e.status === "failed"
+                                    ? "tag-warn"
+                                    : "tag-idle"
+                              }`}
+                            >
+                              {statusLabel(e.status)}
+                            </span>
+                          </div>
                           <div className="muted">
                             {e.groupName ? `${e.groupName} · ` : ""}
                             {formatRelativeDa(e.acceptedAt)}
                           </div>
+                          {e.errorMessage && (
+                            <div className="dash-error" style={{ marginTop: "0.35rem" }}>
+                              {e.errorMessage}
+                            </div>
+                          )}
                           {e.githubRepoFullName && (
                             <a
                               className="my-repo-link"
@@ -332,6 +495,18 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                             </a>
                           )}
                         </div>
+                        {assignment.mode === "individual" && e.status === "failed" && (
+                          <div className="my-repo-actions">
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              disabled={reopeningId === e.id}
+                              onClick={() => void reopenEnrollment(e.id)}
+                            >
+                              {reopeningId === e.id ? "Genåbner…" : "Genåbn repo"}
+                            </button>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

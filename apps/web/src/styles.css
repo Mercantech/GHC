@@ -382,6 +382,16 @@ textarea {
   border-radius: 8px;
 }
 
+.btn-danger-ghost {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+
+.btn-danger-ghost:hover {
+  background: var(--danger-bg);
+}
+
 .error,
 .success {
   border-radius: 10px;
@@ -600,6 +610,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+  flex-wrap: wrap;
   padding: 0.35rem 0.65rem;
   border-radius: 8px;
   background: var(--paper-2);
@@ -612,6 +623,40 @@ textarea {
   font-family: var(--mono);
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+.chip-action {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.chip-action:hover {
+  text-decoration: underline;
+}
+
+.chip-action-danger {
+  color: var(--danger);
+}
+
+.chip-rename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.chip-rename input {
+  min-width: 10rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
 }
 
 .teacher-empty {

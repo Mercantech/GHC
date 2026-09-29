@@ -17,8 +17,19 @@ type GhOptions = {
   accept?: string;
 };
 
-async function ghFetch<T>(path: string, opts: GhOptions): Promise<T> {
-  const res = await fetch(`https://api.github.com${path}`, {
+async function ghFetch<T>(pathOrUrl: string, opts: GhOptions): Promise<T> {
+  const { data } = await ghFetchWithMeta<T>(pathOrUrl, opts);
+  return data;
+}
+
+async function ghFetchWithMeta<T>(
+  pathOrUrl: string,
+  opts: GhOptions,
+): Promise<{ data: T; link: string | null }> {
+  const url = pathOrUrl.startsWith("http")
+    ? pathOrUrl
+    : `https://api.github.com${pathOrUrl}`;
+  const res = await fetch(url, {
     method: opts.method ?? "GET",
     headers: {
       Accept: opts.accept ?? "application/vnd.github+json",
@@ -48,7 +59,13 @@ async function ghFetch<T>(path: string, opts: GhOptions): Promise<T> {
     throw new GitHubError(msg, res.status, data);
   }
 
-  return data as T;
+  return { data: data as T, link: res.headers.get("link") };
+}
+
+function nextLinkFromHeader(link: string | null): string | null {
+  if (!link) return null;
+  const match = link.match(/<([^>]+)>\s*;\s*rel="next"/i);
+  return match?.[1] ?? null;
 }
 
 export type GitHubUser = {
@@ -98,10 +115,35 @@ export async function getOrg(token: string, org: string): Promise<GitHubOrg> {
 }
 
 export async function listOrgRepos(token: string, org: string): Promise<GitHubRepo[]> {
-  return ghFetch<GitHubRepo[]>(
-    `/orgs/${encodeURIComponent(org)}/repos?per_page=100&sort=updated`,
-    { token },
-  );
+  return listAllOrgRepos(token, org);
+}
+
+/** Henter alle org-repos via pagination (GitHub max 100/side). */
+export async function listAllOrgRepos(token: string, org: string): Promise<GitHubRepo[]> {
+  const all: GitHubRepo[] = [];
+  let next: string | null =
+    `/orgs/${encodeURIComponent(org)}/repos?per_page=100&sort=full_name&direction=asc&type=all`;
+  let guard = 0;
+  while (next && guard < 50) {
+    guard += 1;
+    const { data, link } = await ghFetchWithMeta<GitHubRepo[]>(next, { token });
+    all.push(...data);
+    next = nextLinkFromHeader(link);
+  }
+  return all;
+}
+
+export async function repoExists(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<GitHubRepo | null> {
+  try {
+    return await getRepo(token, owner, repo);
+  } catch (err) {
+    if (err instanceof GitHubError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 export async function generateFromTemplate(

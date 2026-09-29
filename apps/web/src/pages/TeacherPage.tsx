@@ -77,10 +77,15 @@ export function TeacherPage({ me }: { me: Me | null }) {
   const [selectedOrg, setSelectedOrg] = useState("");
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
+  const [reposLoading, setReposLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [editOrgName, setEditOrgName] = useState("");
+  const [editOrgToken, setEditOrgToken] = useState("");
+  const [renamingRosterId, setRenamingRosterId] = useState<string | null>(null);
+  const [renameRosterValue, setRenameRosterValue] = useState("");
 
   const [dashboardRepos, setDashboardRepos] = useState<DashboardRepo[]>([]);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
@@ -159,7 +164,11 @@ export function TeacherPage({ me }: { me: Me | null }) {
   useEffect(() => {
     if (!selectedOrg) return;
     setTemplateFilter("all");
+    const org = orgs.find((o) => o.id === selectedOrg);
+    if (org) setEditOrgName(org.name);
+    setEditOrgToken("");
     void (async () => {
+      setReposLoading(true);
       try {
         const [r, reposRes] = await Promise.all([
           api<{ rosters: Roster[] }>(`/orgs/${selectedOrg}/rosters`),
@@ -169,6 +178,8 @@ export function TeacherPage({ me }: { me: Me | null }) {
         setRepos(reposRes.repos);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Kunne ikke hente org-data");
+      } finally {
+        setReposLoading(false);
       }
     })();
     void loadDashboard(selectedOrg);
@@ -193,6 +204,43 @@ export function TeacherPage({ me }: { me: Me | null }) {
     }
   }
 
+  async function updateOrg(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedOrg) return;
+    setError(null);
+    try {
+      await api(`/orgs/${selectedOrg}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editOrgName.trim() || undefined,
+          token: editOrgToken.trim() || undefined,
+        }),
+      });
+      setEditOrgToken("");
+      setInfo("Organisation opdateret");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke opdatere org");
+    }
+  }
+
+  async function deleteOrg() {
+    if (!selectedOrg || !activeOrg) return;
+    const ok = window.confirm(
+      `Slet organisation “${activeOrg.name}”? Alle assignments og rosters under den slettes også.`,
+    );
+    if (!ok) return;
+    setError(null);
+    try {
+      await api(`/orgs/${selectedOrg}`, { method: "DELETE" });
+      setSelectedOrg("");
+      setInfo("Organisation slettet");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke slette org");
+    }
+  }
+
   async function importRoster(e: FormEvent) {
     e.preventDefault();
     if (!selectedOrg) return;
@@ -207,6 +255,60 @@ export function TeacherPage({ me }: { me: Me | null }) {
       setRosters(r.rosters);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import fejlede");
+    }
+  }
+
+  async function renameRoster(rosterId: string) {
+    const name = renameRosterValue.trim();
+    if (!name) return;
+    setError(null);
+    try {
+      await api(`/rosters/${rosterId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      });
+      setRenamingRosterId(null);
+      setRenameRosterValue("");
+      setInfo("Roster omdøbt");
+      if (selectedOrg) {
+        const r = await api<{ rosters: Roster[] }>(`/orgs/${selectedOrg}/rosters`);
+        setRosters(r.rosters);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke omdøbe roster");
+    }
+  }
+
+  async function deleteRoster(roster: Roster) {
+    const ok = window.confirm(`Slet roster “${roster.name}”? Assignments beholder invite men mister roster-krav.`);
+    if (!ok) return;
+    setError(null);
+    try {
+      await api(`/rosters/${roster.id}`, { method: "DELETE" });
+      setInfo("Roster slettet");
+      if (selectedOrg) {
+        const r = await api<{ rosters: Roster[] }>(`/orgs/${selectedOrg}/rosters`);
+        setRosters(r.rosters);
+      }
+      if (rosterId === roster.id) setRosterId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke slette roster");
+    }
+  }
+
+  async function deleteAssignment(a: Assignment) {
+    const ok = window.confirm(
+      `Slet assignment “${a.title}”? Tilmeldinger slettes (GitHub-repos beholdes).`,
+    );
+    if (!ok) return;
+    setError(null);
+    try {
+      await api(`/assignments/manage/${a.id}`, { method: "DELETE" });
+      setInfo("Assignment slettet");
+      await load();
+      if (selectedOrg) void loadDashboard(selectedOrg);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kunne ikke slette assignment");
     }
   }
 
@@ -300,10 +402,55 @@ export function TeacherPage({ me }: { me: Me | null }) {
             <section className="teacher-panel">
               <div className="section-head">
                 <div>
-                  <h2>Tilknyt GitHub-organisation</h2>
-                  <p>PAT gemmes krypteret og bruges til repos og teams.</p>
+                  <h2>{activeOrg ? "Organisations-setup" : "Tilknyt GitHub-organisation"}</h2>
+                  <p>
+                    {activeOrg
+                      ? "Opdatér navn eller PAT, eller tilføj en ny org."
+                      : "PAT gemmes krypteret og bruges til repos og teams."}
+                  </p>
                 </div>
               </div>
+
+              {activeOrg && (
+                <form className="stack" onSubmit={(e) => void updateOrg(e)} style={{ marginBottom: "1.5rem" }}>
+                  <p className="muted mono" style={{ margin: 0 }}>
+                    @{activeOrg.githubOrg}
+                  </p>
+                  <div className="grid-2">
+                    <Field label="Visningsnavn">
+                      <input
+                        value={editOrgName}
+                        onChange={(e) => setEditOrgName(e.target.value)}
+                        required
+                      />
+                    </Field>
+                    <Field label="Ny PAT" hint="lad stå tom for at beholde">
+                      <input
+                        type="password"
+                        value={editOrgToken}
+                        onChange={(e) => setEditOrgToken(e.target.value)}
+                        placeholder="github_pat_…"
+                        autoComplete="off"
+                      />
+                    </Field>
+                  </div>
+                  <div className="row" style={{ gap: "0.5rem" }}>
+                    <button className="btn" type="submit">
+                      Gem ændringer
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger-ghost"
+                      onClick={() => void deleteOrg()}
+                    >
+                      Slet organisation
+                    </button>
+                  </div>
+                  <div className="teacher-divider" />
+                  <h3 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Tilføj ny organisation</h3>
+                </form>
+              )}
+
               <form className="stack" onSubmit={(e) => void createOrg(e)}>
                 <div className="grid-2">
                   <Field label="Visningsnavn" hint="internt i GHC">
@@ -571,8 +718,22 @@ export function TeacherPage({ me }: { me: Me | null }) {
                       repos={repos}
                       value={templateRepo}
                       onChange={setTemplateRepo}
-                      placeholder="Vælg template eller repo…"
+                      placeholder={
+                        reposLoading
+                          ? "Henter alle repos fra org…"
+                          : "Vælg template eller repo…"
+                      }
                     />
+                    {reposLoading ? (
+                      <p className="muted" style={{ margin: "-0.35rem 0 0", fontSize: "0.85rem" }}>
+                        Henter alle org-repos (kan tage et øjeblik ved 400+)…
+                      </p>
+                    ) : (
+                      <p className="muted" style={{ margin: "-0.35rem 0 0", fontSize: "0.85rem" }}>
+                        {repos.length} repos hentet · {repos.filter((r) => r.isTemplate).length}{" "}
+                        templates
+                      </p>
+                    )}
 
                     <div>
                       <div className="field-label" style={{ marginBottom: "0.45rem" }}>
@@ -658,8 +819,53 @@ export function TeacherPage({ me }: { me: Me | null }) {
                     <ul className="teacher-chips">
                       {rosters.map((r) => (
                         <li key={r.id}>
-                          {r.name}
-                          <span>{r.memberCount}</span>
+                          {renamingRosterId === r.id ? (
+                            <form
+                              className="chip-rename"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                void renameRoster(r.id);
+                              }}
+                            >
+                              <input
+                                value={renameRosterValue}
+                                onChange={(e) => setRenameRosterValue(e.target.value)}
+                                autoFocus
+                              />
+                              <button type="submit" className="btn btn-sm">
+                                Gem
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => setRenamingRosterId(null)}
+                              >
+                                Annuller
+                              </button>
+                            </form>
+                          ) : (
+                            <>
+                              {r.name}
+                              <span>{r.memberCount}</span>
+                              <button
+                                type="button"
+                                className="chip-action"
+                                onClick={() => {
+                                  setRenamingRosterId(r.id);
+                                  setRenameRosterValue(r.name);
+                                }}
+                              >
+                                Omdøb
+                              </button>
+                              <button
+                                type="button"
+                                className="chip-action chip-action-danger"
+                                onClick={() => void deleteRoster(r)}
+                              >
+                                Slet
+                              </button>
+                            </>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -713,6 +919,13 @@ export function TeacherPage({ me }: { me: Me | null }) {
                               >
                                 <CopyIcon />
                                 {copied === a.id ? "Kopieret" : "Kopiér"}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger-ghost btn-sm"
+                                onClick={() => void deleteAssignment(a)}
+                              >
+                                Slet
                               </button>
                             </div>
                           </li>
