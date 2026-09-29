@@ -70,6 +70,49 @@ export const routes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  /** Repos the current user has accepted via GHC. */
+  app.get("/me/repos", async (request) => {
+    const enrollments = await prisma.enrollment.findMany({
+      where: {
+        userId: request.user!.sub,
+        status: "active",
+        githubRepoFullName: { not: null },
+      },
+      include: {
+        assignment: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            mode: true,
+            org: { select: { name: true, githubOrg: true } },
+          },
+        },
+        group: { select: { id: true, name: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return {
+      repos: enrollments.map((e) => ({
+        enrollmentId: e.id,
+        fullName: e.githubRepoFullName!,
+        htmlUrl: `https://github.com/${e.githubRepoFullName}`,
+        status: e.status,
+        acceptedAt: e.updatedAt,
+        assignment: {
+          id: e.assignment.id,
+          title: e.assignment.title,
+          slug: e.assignment.slug,
+          mode: e.assignment.mode,
+          orgName: e.assignment.org.name,
+          githubOrg: e.assignment.org.githubOrg,
+        },
+        groupName: e.group?.name ?? null,
+      })),
+    };
+  });
+
   // --- Orgs ---
   app.get("/orgs", async (request, reply) => {
     if (!(await requireTeacher(request, reply))) return;

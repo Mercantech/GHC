@@ -1059,6 +1059,46 @@ textarea {
   }
 }
 
+.my-repos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+.my-repos li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.my-repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.my-repo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .my-repos li {
+    flex-direction: column;
+  }
+}
+
 .mode-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;

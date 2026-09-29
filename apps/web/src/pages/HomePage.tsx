@@ -5,6 +5,32 @@ import { beginLogin, isLoggedIn } from "../auth";
 import { Field, Layout, type Me } from "../components";
 import { GitHubMark } from "../icons";
 
+type MyRepo = {
+  enrollmentId: string;
+  fullName: string;
+  htmlUrl: string;
+  acceptedAt: string;
+  assignment: {
+    id: string;
+    title: string;
+    slug: string;
+    mode: "individual" | "group";
+    orgName: string;
+    githubOrg: string;
+  };
+  groupName: string | null;
+};
+
+function formatAccepted(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("da-DK", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function HomePage({
   me,
   loading,
@@ -18,10 +44,24 @@ export function HomePage({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [repos, setRepos] = useState<MyRepo[]>([]);
+  const [reposLoading, setReposLoading] = useState(false);
 
   useEffect(() => {
     setGithubLogin(me?.githubLogin ?? "");
   }, [me?.githubLogin]);
+
+  useEffect(() => {
+    if (!me) {
+      setRepos([]);
+      return;
+    }
+    setReposLoading(true);
+    void api<{ repos: MyRepo[] }>("/me/repos")
+      .then((res) => setRepos(res.repos))
+      .catch(() => setRepos([]))
+      .finally(() => setReposLoading(false));
+  }, [me]);
 
   async function saveGithub(e: FormEvent) {
     e.preventDefault();
@@ -76,9 +116,71 @@ export function HomePage({
             <h1>Hej {me.name?.split(" ")[0] ?? ""}</h1>
             <p>
               {me.isTeacher
-                ? "Opsæt organisation, roster og assignments — eller åbn et invite-link som elev."
-                : "Åbn invite-linket fra din underviser for at tilmelde dig en opgave."}
+                ? "Se dine egne repos, eller åbn underviser-dashboardet."
+                : "Her ser du de repos, du har fået via GHC."}
             </p>
+          </section>
+
+          <section className="section" style={{ gridColumn: "1 / -1" }}>
+            <div className="section-head">
+              <div>
+                <h2>Mine repos</h2>
+                <p>Opgaver du har accepteret gennem systemet.</p>
+              </div>
+              <span className="step">{repos.length || "0"}</span>
+            </div>
+
+            {reposLoading ? (
+              <p className="muted">Henter dine repos…</p>
+            ) : repos.length === 0 ? (
+              <p className="muted">
+                Du har ingen repos endnu. Åbn et invite-link fra din underviser for at komme i
+                gang.
+              </p>
+            ) : (
+              <ul className="my-repos">
+                {repos.map((r) => (
+                  <li key={r.enrollmentId}>
+                    <div className="my-repo-main">
+                      <div className="row" style={{ gap: "0.5rem", marginBottom: "0.3rem" }}>
+                        <span className="list-title">{r.assignment.title}</span>
+                        <span className={`tag tag-${r.assignment.mode}`}>
+                          {r.assignment.mode === "group" ? "Gruppe" : "Individuel"}
+                        </span>
+                      </div>
+                      <div className="muted">
+                        {r.assignment.orgName}
+                        {r.groupName ? ` · ${r.groupName}` : ""}
+                        {r.acceptedAt ? ` · ${formatAccepted(r.acceptedAt)}` : ""}
+                      </div>
+                      <a
+                        className="my-repo-link"
+                        href={r.htmlUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <GitHubMark size={14} />
+                        <span className="mono">{r.fullName}</span>
+                      </a>
+                    </div>
+                    <div className="my-repo-actions">
+                      <a
+                        className="btn btn-github btn-sm"
+                        href={r.htmlUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <GitHubMark size={14} />
+                        Åbn
+                      </a>
+                      <Link className="btn btn-ghost btn-sm" to={`/a/${r.assignment.slug}`}>
+                        Opgave
+                      </Link>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           {me.isTeacher && (
