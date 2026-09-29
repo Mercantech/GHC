@@ -19,7 +19,47 @@ type Assignment = {
 };
 type Repo = { fullName: string; name: string; isTemplate: boolean };
 
+type DashboardRepo = {
+  fullName: string;
+  htmlUrl: string | null;
+  assignmentId: string;
+  assignmentTitle: string;
+  mode: "individual" | "group";
+  groupName: string | null;
+  students: string[];
+  startedAt: string;
+  lastCommitAt: string | null;
+  lastCommitMessage: string | null;
+  lastCommitAuthor: string | null;
+  commitsSinceStart: number;
+  hasCommitsSinceStart: boolean;
+  error: string | null;
+};
+
+type DashboardSummary = {
+  total: number;
+  withActivity: number;
+  idle: number;
+  errors: number;
+};
+
 const webOrigin = import.meta.env.VITE_WEB_ORIGIN ?? window.location.origin;
+
+function formatRelativeDa(iso: string | null): string {
+  if (!iso) return "—";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const diffSec = Math.round((Date.now() - then) / 1000);
+  if (diffSec < 60) return "lige nu";
+  const mins = Math.round(diffSec / 60);
+  if (mins < 60) return `${mins} min. siden`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `${hours} t. siden`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days} dage siden`;
+  const months = Math.round(days / 30);
+  return `${months} mdr. siden`;
+}
 
 export function TeacherPage({ me }: { me: Me | null }) {
   const [orgs, setOrgs] = useState<Org[]>([]);
@@ -30,6 +70,11 @@ export function TeacherPage({ me }: { me: Me | null }) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
+  const [dashboardRepos, setDashboardRepos] = useState<DashboardRepo[]>([]);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardFilter, setDashboardFilter] = useState<"all" | "active" | "idle">("all");
 
   const [orgName, setOrgName] = useState("");
   const [githubOrg, setGithubOrg] = useState("");
@@ -57,6 +102,26 @@ export function TeacherPage({ me }: { me: Me | null }) {
     }
   }
 
+  async function loadDashboard(orgId: string) {
+    if (!orgId) {
+      setDashboardRepos([]);
+      setDashboardSummary(null);
+      return;
+    }
+    setDashboardLoading(true);
+    try {
+      const res = await api<{ repos: DashboardRepo[]; summary: DashboardSummary }>(
+        `/dashboard/repos?orgId=${encodeURIComponent(orgId)}`,
+      );
+      setDashboardRepos(res.repos);
+      setDashboardSummary(res.summary);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Kunne ikke hente repo-oversigt");
+    } finally {
+      setDashboardLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (me?.isTeacher) {
       void load().catch((e) => setError(e instanceof Error ? e.message : "Fejl"));
@@ -77,6 +142,7 @@ export function TeacherPage({ me }: { me: Me | null }) {
         setError(e instanceof Error ? e.message : "Kunne ikke hente org-data");
       }
     })();
+    void loadDashboard(selectedOrg);
   }, [selectedOrg]);
 
   async function createOrg(e: FormEvent) {
@@ -142,18 +208,24 @@ export function TeacherPage({ me }: { me: Me | null }) {
     }
   }
 
-  async function copyInvite(token: string, id: string) {
-    const link = `${webOrigin}/invite/${token}`;
+  async function copyInvite(inviteToken: string, id: string) {
+    const link = `${webOrigin}/invite/${inviteToken}`;
     await navigator.clipboard.writeText(link);
     setCopied(id);
   }
+
+  const filteredDashboard = dashboardRepos.filter((r) => {
+    if (dashboardFilter === "active") return r.hasCommitsSinceStart;
+    if (dashboardFilter === "idle") return !r.hasCommitsSinceStart && !r.error;
+    return true;
+  });
 
   return (
     <RequireTeacher me={me}>
       <Layout me={me}>
         <div className="page-head">
           <h1>Underviser</h1>
-          <p>Kobl en GitHub-org, importér holdet, og udgiv assignments med invite-links.</p>
+          <p>Kobl en GitHub-org, følg elev-repos, og udgiv assignments med invite-links.</p>
         </div>
 
         {error && <div className="error">{error}</div>}
@@ -162,10 +234,162 @@ export function TeacherPage({ me }: { me: Me | null }) {
         <section className="section">
           <div className="section-head">
             <div>
+              <h2>Aktiv organisation</h2>
+              <p>Vælg org for oversigt, roster og assignments.</p>
+            </div>
+            <span className="step">01</span>
+          </div>
+          <Field label="Organisation">
+            <select value={selectedOrg} onChange={(e) => setSelectedOrg(e.target.value)}>
+              <option value="">Vælg organisation…</option>
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name} (@{o.githubOrg})
+                </option>
+              ))}
+            </select>
+          </Field>
+        </section>
+
+        {selectedOrg && (
+          <section className="section">
+            <div className="section-head">
+              <div>
+                <h2>Repo-oversigt</h2>
+                <p>Repos oprettet via GHC — sidste commit og aktivitet siden start.</p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={dashboardLoading}
+                onClick={() => void loadDashboard(selectedOrg)}
+              >
+                {dashboardLoading ? "Henter…" : "Opdater"}
+              </button>
+            </div>
+
+            {dashboardSummary && (
+              <div className="dash-summary" role="group" aria-label="Repo-status">
+                <button
+                  type="button"
+                  className={dashboardFilter === "all" ? "is-active" : undefined}
+                  onClick={() => setDashboardFilter("all")}
+                >
+                  <strong>{dashboardSummary.total}</strong>
+                  <span>repos</span>
+                </button>
+                <button
+                  type="button"
+                  className={dashboardFilter === "active" ? "is-active" : undefined}
+                  onClick={() => setDashboardFilter("active")}
+                >
+                  <strong>{dashboardSummary.withActivity}</strong>
+                  <span>med commits</span>
+                </button>
+                <button
+                  type="button"
+                  className={dashboardFilter === "idle" ? "is-active" : undefined}
+                  onClick={() => setDashboardFilter("idle")}
+                >
+                  <strong>{dashboardSummary.idle}</strong>
+                  <span>uden commits</span>
+                </button>
+              </div>
+            )}
+
+            {dashboardLoading && dashboardRepos.length === 0 ? (
+              <p className="muted">Henter aktivitet fra GitHub…</p>
+            ) : filteredDashboard.length === 0 ? (
+              <p className="muted">
+                {dashboardRepos.length === 0
+                  ? "Ingen elev-repos endnu. Del et invite-link for at komme i gang."
+                  : "Ingen repos matcher filteret."}
+              </p>
+            ) : (
+              <div className="dash-table-wrap">
+                <table className="dash-table">
+                  <thead>
+                    <tr>
+                      <th>Repo</th>
+                      <th>Assignment</th>
+                      <th>Elev / gruppe</th>
+                      <th>Sidste commit</th>
+                      <th>Siden start</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDashboard.map((r) => (
+                      <tr key={`${r.assignmentId}:${r.fullName}`}>
+                        <td>
+                          <a
+                            href={r.htmlUrl ?? `https://github.com/${r.fullName}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="dash-repo"
+                          >
+                            <GitHubMark size={14} />
+                            <span className="mono">{r.fullName.split("/")[1] ?? r.fullName}</span>
+                          </a>
+                          {r.error && <div className="dash-error">{r.error}</div>}
+                        </td>
+                        <td>
+                          <div className="dash-title">{r.assignmentTitle}</div>
+                          <span className={`tag tag-${r.mode}`}>
+                            {r.mode === "group" ? "Gruppe" : "Individuel"}
+                          </span>
+                        </td>
+                        <td>
+                          {r.groupName ? (
+                            <>
+                              <div className="dash-title">{r.groupName}</div>
+                              <div className="muted">{r.students.join(", ") || "—"}</div>
+                            </>
+                          ) : (
+                            <span className="mono">@{r.students[0] ?? "—"}</span>
+                          )}
+                        </td>
+                        <td>
+                          {r.lastCommitAt ? (
+                            <>
+                              <div className="dash-title">{formatRelativeDa(r.lastCommitAt)}</div>
+                              <div className="muted dash-msg" title={r.lastCommitMessage ?? undefined}>
+                                {r.lastCommitAuthor ? `${r.lastCommitAuthor}: ` : ""}
+                                {r.lastCommitMessage ?? "—"}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="muted">Ingen data</span>
+                          )}
+                        </td>
+                        <td>
+                          {r.error ? (
+                            <span className="tag tag-warn">Fejl</span>
+                          ) : r.hasCommitsSinceStart ? (
+                            <span className="tag tag-ok">
+                              {r.commitsSinceStart >= 100
+                                ? "100+ commits"
+                                : `${r.commitsSinceStart} commit${r.commitsSinceStart === 1 ? "" : "s"}`}
+                            </span>
+                          ) : (
+                            <span className="tag tag-idle">Ingen endnu</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        <section className="section">
+          <div className="section-head">
+            <div>
               <h2>Tilknyt GitHub-organisation</h2>
               <p>PAT gemmes krypteret og bruges til at oprette repos og teams.</p>
             </div>
-            <span className="step">01</span>
+            <span className="step">02</span>
           </div>
           <form className="stack" onSubmit={(e) => void createOrg(e)}>
             <div className="grid-2">
@@ -203,26 +427,6 @@ export function TeacherPage({ me }: { me: Me | null }) {
               </button>
             </div>
           </form>
-        </section>
-
-        <section className="section">
-          <div className="section-head">
-            <div>
-              <h2>Aktiv organisation</h2>
-              <p>Vælg hvilken org roster og assignments skal bruge.</p>
-            </div>
-            <span className="step">02</span>
-          </div>
-          <Field label="Organisation">
-            <select value={selectedOrg} onChange={(e) => setSelectedOrg(e.target.value)}>
-              <option value="">Vælg organisation…</option>
-              {orgs.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name} (@{o.githubOrg})
-                </option>
-              ))}
-            </select>
-          </Field>
         </section>
 
         {selectedOrg && (

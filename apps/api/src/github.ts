@@ -62,6 +62,20 @@ export type GitHubRepo = {
   full_name: string;
   html_url: string;
   is_template?: boolean;
+  created_at?: string;
+  pushed_at?: string;
+  default_branch?: string;
+};
+
+export type GitHubCommit = {
+  sha: string;
+  html_url: string;
+  commit: {
+    message: string;
+    author: { name: string; date: string } | null;
+    committer: { name: string; date: string } | null;
+  };
+  author: { login: string } | null;
 };
 
 export type GitHubOrg = {
@@ -179,6 +193,47 @@ export async function addTeamRepoPermission(
       body: { permission },
     },
   );
+}
+
+export async function getRepo(token: string, owner: string, repo: string): Promise<GitHubRepo> {
+  return ghFetch<GitHubRepo>(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+    { token },
+  );
+}
+
+export async function getLatestCommit(
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<GitHubCommit | null> {
+  const commits = await ghFetch<GitHubCommit[]>(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=1`,
+    { token },
+  );
+  return commits[0] ?? null;
+}
+
+/** Commits with author date >= since (typically student work after repo creation). */
+export async function listCommitsSince(
+  token: string,
+  owner: string,
+  repo: string,
+  since: string,
+  perPage = 100,
+): Promise<GitHubCommit[]> {
+  return ghFetch<GitHubCommit[]>(
+    `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?since=${encodeURIComponent(since)}&per_page=${perPage}`,
+    { token },
+  );
+}
+
+export function parseRepoFullName(fullName: string): { owner: string; repo: string } {
+  const parts = fullName.split("/");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error("repo must be owner/repo");
+  }
+  return { owner: parts[0], repo: parts[1] };
 }
 
 export function slugifyRepoName(input: string): string {

@@ -11,8 +11,12 @@ import {
   addTeamRepoPermission,
   createTeam,
   generateFromTemplate,
+  getLatestCommit,
   getOrg,
+  getRepo,
+  listCommitsSince,
   listOrgRepos,
+  parseRepoFullName,
   parseTemplateRepo,
   slugifyRepoName,
 } from "./github.js";
@@ -128,6 +132,204 @@ export const routes: FastifyPluginAsync = async (app) => {
         isTemplate: Boolean(r.is_template),
         htmlUrl: r.html_url,
       })),
+    };
+  });
+
+  /** Overview of repos created via GHC with last-commit age and activity since start. */
+  app.get("/dashboard/repos", async (request, reply) => {
+    if (!(await requireTeacher(request, reply))) return;
+
+    const query = z
+      .object({
+        orgId: z.string().optional(),
+        assignmentId: z.string().optional(),
+      })
+      .parse(request.query);
+
+    const orgs = await prisma.org.findMany({
+      where: {
+        createdBySub: request.user!.sub,
+        ...(query.orgId ? { id: query.orgId } : {}),
+      },
+    });
+    if (orgs.length === 0) {
+      return { repos: [], summary: { total: 0, withActivity: 0, idle: 0, errors: 0 } };
+    }
+
+    type RepoRow = {
+      fullName: string;
+      htmlUrl: string | null;
+      assignmentId: string;
+      assignmentTitle: string;
+      assignmentSlug: string;
+      mode: "individual" | "group";
+      orgId: string;
+      githubOrg: string;
+      groupName: string | null;
+      students: string[];
+      startedAt: string;
+      lastCommitAt: string | null;
+      lastCommitMessage: string | null;
+      lastCommitAuthor: string | null;
+      commitsSinceStart: number;
+      hasCommitsSinceStart: boolean;
+      error: string | null;
+    };
+
+    const pending: Array<{
+      fullName: string;
+      assignmentId: string;
+      assignmentTitle: string;
+      assignmentSlug: string;
+      mode: "individual" | "group";
+      orgId: string;
+      githubOrg: string;
+      groupName: string | null;
+      students: string[];
+      startedAt: Date;
+      token: string;
+    }> = [];
+
+    for (const org of orgs) {
+      let token: string;
+      try {
+        token = decryptSecret(org.tokenEncrypted);
+      } catch {
+        continue;
+      }
+
+      const assignments = await prisma.assignment.findMany({
+        where: {
+          orgId: org.id,
+          ...(query.assignmentId ? { id: query.assignmentId } : {}),
+        },
+        include: {
+          groups: true,
+          enrollments: {
+            where: { status: "active", githubRepoFullName: { not: null } },
+            include: { user: { select: { githubLogin: true, name: true } } },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      for (const assignment of assignments) {
+        if (assignment.mode === "group") {
+          for (const group of assignment.groups) {
+            const members = assignment.enrollments
+              .filter((e) => e.groupId === group.id)
+              .map((e) => e.user.githubLogin ?? e.user.name ?? "ukendt")
+              .filter(Boolean) as string[];
+            pending.push({
+              fullName: group.githubRepoFullName,
+              assignmentId: assignment.id,
+              assignmentTitle: assignment.title,
+              assignmentSlug: assignment.slug,
+              mode: "group",
+              orgId: org.id,
+              githubOrg: org.githubOrg,
+              groupName: group.name,
+              students: members,
+              startedAt: group.createdAt,
+              token,
+            });
+          }
+        } else {
+          for (const enrollment of assignment.enrollments) {
+            if (!enrollment.githubRepoFullName) continue;
+            pending.push({
+              fullName: enrollment.githubRepoFullName,
+              assignmentId: assignment.id,
+              assignmentTitle: assignment.title,
+              assignmentSlug: assignment.slug,
+              mode: "individual",
+              orgId: org.id,
+              githubOrg: org.githubOrg,
+              groupName: null,
+              students: [
+                enrollment.user.githubLogin ?? enrollment.user.name ?? "ukendt",
+              ],
+              startedAt: enrollment.updatedAt,
+              token,
+            });
+          }
+        }
+      }
+    }
+
+    async function enrich(row: (typeof pending)[number]): Promise<RepoRow> {
+      const base: RepoRow = {
+        fullName: row.fullName,
+        htmlUrl: `https://github.com/${row.fullName}`,
+        assignmentId: row.assignmentId,
+        assignmentTitle: row.assignmentTitle,
+        assignmentSlug: row.assignmentSlug,
+        mode: row.mode,
+        orgId: row.orgId,
+        githubOrg: row.githubOrg,
+        groupName: row.groupName,
+        students: row.students,
+        startedAt: row.startedAt.toISOString(),
+        lastCommitAt: null,
+        lastCommitMessage: null,
+        lastCommitAuthor: null,
+        commitsSinceStart: 0,
+        hasCommitsSinceStart: false,
+        error: null,
+      };
+
+      try {
+        const { owner, repo } = parseRepoFullName(row.fullName);
+        const ghRepo = await getRepo(row.token, owner, repo);
+        // Commits after GitHub repo creation ≈ elev-arbejde (template-commits har ældre dates).
+        const sinceIso = ghRepo.created_at ?? row.startedAt.toISOString();
+        const [latest, commits] = await Promise.all([
+          getLatestCommit(row.token, owner, repo),
+          listCommitsSince(row.token, owner, repo, sinceIso),
+        ]);
+
+        base.htmlUrl = ghRepo.html_url;
+        base.commitsSinceStart = commits.length;
+        base.hasCommitsSinceStart = commits.length > 0;
+
+        if (latest) {
+          base.lastCommitAt =
+            latest.commit.committer?.date ?? latest.commit.author?.date ?? null;
+          base.lastCommitMessage = latest.commit.message.split("\n")[0] ?? null;
+          base.lastCommitAuthor =
+            latest.author?.login ?? latest.commit.author?.name ?? null;
+        } else if (ghRepo.pushed_at) {
+          base.lastCommitAt = ghRepo.pushed_at;
+        }
+      } catch (err) {
+        base.error =
+          err instanceof GitHubError ? err.message : "Kunne ikke hente GitHub-aktivitet";
+      }
+
+      return base;
+    }
+
+    const concurrency = 5;
+    const repos: RepoRow[] = [];
+    for (let i = 0; i < pending.length; i += concurrency) {
+      const chunk = pending.slice(i, i + concurrency);
+      repos.push(...(await Promise.all(chunk.map((row) => enrich(row)))));
+    }
+
+    repos.sort((a, b) => {
+      const aTime = a.lastCommitAt ? new Date(a.lastCommitAt).getTime() : 0;
+      const bTime = b.lastCommitAt ? new Date(b.lastCommitAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return {
+      repos,
+      summary: {
+        total: repos.length,
+        withActivity: repos.filter((r) => r.hasCommitsSinceStart).length,
+        idle: repos.filter((r) => !r.hasCommitsSinceStart && !r.error).length,
+        errors: repos.filter((r) => r.error).length,
+      },
     };
   });
 
