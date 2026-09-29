@@ -1,7 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
-import { Field, Layout, RequireAuth, type Me } from "../components";
+import { Layout, RequireAuth, type Me } from "../components";
 import { GitHubMark } from "../icons";
 
 type Group = { id: string; name: string; repo: string; memberCount: number };
@@ -26,6 +26,24 @@ type AssignmentPayload = {
   enrollment: Enrollment | null;
 };
 
+function InviteShell({
+  me,
+  children,
+}: {
+  me: Me | null;
+  children: ReactNode;
+}) {
+  return (
+    <Layout me={me} landing>
+      <div className="invite">
+        <div className="invite-atmosphere" aria-hidden="true" />
+        <div className="invite-grid" aria-hidden="true" />
+        {children}
+      </div>
+    </Layout>
+  );
+}
+
 function AssignmentView({
   me,
   data,
@@ -47,6 +65,8 @@ function AssignmentView({
   setError: (v: string | null) => void;
   setBusy: (v: boolean) => void;
 }) {
+  const [groupMode, setGroupMode] = useState<"create" | "join">("create");
+
   async function acceptIndividual() {
     if (!data) return;
     setBusy(true);
@@ -96,209 +116,282 @@ function AssignmentView({
   }
 
   const enrolled = data?.enrollment?.status === "active";
+  const repoUrl = data?.enrollment?.githubRepoFullName
+    ? `https://github.com/${data.enrollment.githubRepoFullName}`
+    : null;
+
+  if (!data && !error) {
+    return (
+      <div className="invite-stage">
+        <div className="invite-loading">
+          <div className="invite-pulse" />
+          <p>Henter din opgave…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <div className="invite-stage">
+        <div className="invite-panel invite-panel-error">
+          <p className="invite-kicker">Noget gik galt</p>
+          <h1 className="invite-title">Kunne ikke åbne opgaven</h1>
+          <p className="invite-lead">{error}</p>
+          <Link className="btn btn-ghost" to="/">
+            Til forsiden
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const a = data.assignment;
+
+  if (enrolled && repoUrl) {
+    return (
+      <div className="invite-stage invite-stage-done">
+        <div className="invite-panel">
+          <p className="invite-kicker invite-kicker-ok">Du er med</p>
+          <h1 className="invite-title">{a.title}</h1>
+          <p className="invite-lead">
+            Dit repo er klar. Åbn det på GitHub og gå i gang — commits lander automatisk i
+            oversigten hos din underviser.
+          </p>
+          <div className="invite-actions">
+            <a className="btn btn-github btn-xl" href={repoUrl} target="_blank" rel="noreferrer">
+              <GitHubMark size={20} />
+              Åbn {data.enrollment!.githubRepoFullName}
+            </a>
+            <Link className="btn btn-ghost btn-xl" to="/">
+              Tilbage til GHC
+            </Link>
+          </div>
+        </div>
+        <div className="invite-done-mark" aria-hidden="true">
+          <span />
+        </div>
+      </div>
+    );
+  }
+
+  if (!me?.githubLogin) {
+    return (
+      <div className="invite-stage">
+        <div className="invite-panel">
+          <p className="invite-kicker">{a.org.name}</p>
+          <h1 className="invite-title">{a.title}</h1>
+          <p className="invite-lead">
+            Du mangler et GitHub-brugernavn, før vi kan give dig write-adgang til repoet.
+          </p>
+          <div className="invite-actions">
+            <Link className="btn btn-xl" to="/">
+              Sæt GitHub-brugernavn
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (busy) {
+    return (
+      <div className="invite-stage">
+        <div className="invite-panel invite-panel-busy">
+          <div className="invite-spinner" aria-hidden="true" />
+          <p className="invite-kicker">Et øjeblik</p>
+          <h1 className="invite-title">Opretter dit repo</h1>
+          <p className="invite-lead">
+            Vi genererer repoet fra template og giver{" "}
+            <span className="mono">@{me.githubLogin}</span> write-adgang.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      {!data && !error && <p className="muted">Henter opgave…</p>}
-      {error && <div className="error">{error}</div>}
-      {data && (
-        <>
-          <section className="page-head">
-            <p className="muted" style={{ marginBottom: "0.4rem" }}>
-              {data.assignment.org.name}
+    <div className="invite-stage">
+      <div className="invite-panel">
+        <div className="invite-meta">
+          <span className="invite-org">{a.org.name}</span>
+          <span className={`tag tag-${a.mode}`}>
+            {a.mode === "group" ? "Gruppe" : "Individuel"}
+          </span>
+        </div>
+        <h1 className="invite-title">{a.title}</h1>
+        <p className="invite-lead">
+          {a.mode === "group"
+            ? "Opret en gruppe eller join en eksisterende — I deler ét repo via GitHub Teams."
+            : "Acceptér, så opretter vi et offentligt repo til dig fra template og giver dig write-adgang."}
+        </p>
+
+        {error && <div className="invite-inline-error">{error}</div>}
+
+        {a.mode === "individual" && (
+          <div className="invite-actions">
+            <button
+              className="btn btn-github btn-xl"
+              type="button"
+              onClick={() => void acceptIndividual()}
+            >
+              <GitHubMark size={20} />
+              Acceptér opgave
+            </button>
+            <p className="invite-hint">
+              Logger ind som <span className="mono">@{me.githubLogin}</span> · {a.templateRepo}
             </p>
-            <h1>{data.assignment.title}</h1>
-            <p>
-              <span className={`tag tag-${data.assignment.mode}`}>
-                {data.assignment.mode === "group" ? "Gruppe" : "Individuel"}
-              </span>{" "}
-              <span className="mono" style={{ marginLeft: "0.35rem" }}>
-                {data.assignment.templateRepo}
-              </span>
-            </p>
-          </section>
+          </div>
+        )}
 
-          {!me?.githubLogin && (
-            <div className="error">
-              Du mangler et GitHub-brugernavn. <Link to="/">Sæt det på forsiden</Link> før du
-              tilmelder dig.
-            </div>
-          )}
-
-          {enrolled && (
-            <div className="success">
-              Du er tilmeldt.{" "}
-              <a
-                className="repo-link"
-                href={`https://github.com/${data.enrollment!.githubRepoFullName}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <GitHubMark size={14} />
-                {data.enrollment!.githubRepoFullName}
-              </a>
-            </div>
-          )}
-
-          {data.assignment.mode === "individual" && !enrolled && me?.githubLogin && (
-            <section className="section">
-              <div className="section-head">
-                <div>
-                  <h2>Tilmeld dig</h2>
-                  <p>Opretter et offentligt repo fra template og giver dig write-adgang.</p>
-                </div>
-                <GitHubMark size={22} />
-              </div>
+        {a.mode === "group" && (
+          <div className="invite-group">
+            <div className="invite-tabs" role="tablist" aria-label="Gruppevalg">
               <button
-                className="btn btn-github"
                 type="button"
-                disabled={busy}
-                onClick={() => void acceptIndividual()}
+                role="tab"
+                aria-selected={groupMode === "create"}
+                className={groupMode === "create" ? "is-active" : undefined}
+                onClick={() => setGroupMode("create")}
               >
-                <GitHubMark size={16} />
-                {busy ? "Opretter repo…" : "Acceptér opgave"}
+                Opret gruppe
               </button>
-            </section>
-          )}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={groupMode === "join"}
+                className={groupMode === "join" ? "is-active" : undefined}
+                onClick={() => setGroupMode("join")}
+              >
+                Join gruppe
+                {a.groups.length > 0 ? ` (${a.groups.length})` : ""}
+              </button>
+            </div>
 
-          {data.assignment.mode === "group" && !enrolled && me?.githubLogin && (
-            <>
-              <section className="section">
-                <div className="section-head">
-                  <div>
-                    <h2>Opret gruppe</h2>
-                    <p>Første elev opretter Team + repo. Resten joiner bagefter.</p>
-                  </div>
-                  <span className="step">01</span>
-                </div>
-                <form className="stack" onSubmit={(e) => void createGroup(e)}>
-                  <Field label="Gruppenavn" hint="bliver en del af repo-navnet">
-                    <input
-                      value={groupName}
-                      onChange={(e) => setGroupName(e.target.value)}
-                      placeholder="team-alpha"
-                      required
-                    />
-                  </Field>
-                  <button className="btn btn-github" type="submit" disabled={busy}>
-                    <GitHubMark size={16} />
-                    {busy ? "Opretter…" : "Opret gruppe + repo"}
-                  </button>
-                </form>
-              </section>
-
-              <section className="section">
-                <div className="section-head">
-                  <div>
-                    <h2>Join eksisterende gruppe</h2>
-                    <p>Du får adgang via GitHub Team.</p>
-                  </div>
-                  <span className="step">02</span>
-                </div>
-                {data.assignment.groups.length === 0 ? (
-                  <p className="muted">Ingen grupper endnu — opret den første ovenfor.</p>
-                ) : (
-                  <ul className="list">
-                    {data.assignment.groups.map((g) => (
-                      <li key={g.id}>
-                        <div>
-                          <div className="list-title">{g.name}</div>
-                          <div className="muted">
-                            {g.memberCount} medlem{g.memberCount === 1 ? "" : "mer"}
-                            {data.assignment.maxTeamSize
-                              ? ` / max ${data.assignment.maxTeamSize}`
-                              : ""}
-                          </div>
-                        </div>
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void joinGroup(g.id)}
-                        >
-                          Join
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </>
-          )}
-        </>
-      )}
-    </>
+            {groupMode === "create" ? (
+              <form className="invite-create" onSubmit={(e) => void createGroup(e)}>
+                <label className="invite-field">
+                  <span>Gruppenavn</span>
+                  <input
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="team-alpha"
+                    required
+                    autoFocus
+                  />
+                </label>
+                <button className="btn btn-github btn-xl" type="submit">
+                  <GitHubMark size={20} />
+                  Opret gruppe + repo
+                </button>
+                <p className="invite-hint">
+                  Du bliver maintainer. Resten af holdet joiner bagefter.
+                </p>
+              </form>
+            ) : a.groups.length === 0 ? (
+              <p className="invite-empty">
+                Ingen grupper endnu. Skift til <strong>Opret gruppe</strong> og lav den første.
+              </p>
+            ) : (
+              <ul className="invite-join-list">
+                {a.groups.map((g) => (
+                  <li key={g.id}>
+                    <div>
+                      <strong>{g.name}</strong>
+                      <span>
+                        {g.memberCount} medlem{g.memberCount === 1 ? "" : "mer"}
+                        {a.maxTeamSize ? ` · max ${a.maxTeamSize}` : ""}
+                      </span>
+                    </div>
+                    <button
+                      className="btn btn-ghost"
+                      type="button"
+                      onClick={() => void joinGroup(g.id)}
+                    >
+                      Join
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
-export function InvitePage({ me }: { me: Me | null }) {
-  const { token } = useParams();
+function InviteRouteBody({
+  me,
+  load,
+  deps,
+}: {
+  me: Me | null;
+  load: () => Promise<AssignmentPayload>;
+  deps: unknown[];
+}) {
   const [data, setData] = useState<AssignmentPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [groupName, setGroupName] = useState("");
 
-  async function load() {
-    if (!token) return;
-    const res = await api<AssignmentPayload>(`/assignments/by-invite/${token}`);
+  async function reload() {
+    const res = await load();
     setData(res);
   }
 
   useEffect(() => {
-    void load().catch((e) => setError(e instanceof Error ? e.message : "Fejl"));
-  }, [token]);
+    void reload().catch((e) => setError(e instanceof Error ? e.message : "Fejl"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
 
   return (
+    <InviteShell me={me}>
+      <AssignmentView
+        me={me}
+        data={data}
+        error={error}
+        busy={busy}
+        groupName={groupName}
+        setGroupName={setGroupName}
+        onReload={reload}
+        setError={setError}
+        setBusy={setBusy}
+      />
+    </InviteShell>
+  );
+}
+
+export function InvitePage({ me }: { me: Me | null }) {
+  const { token } = useParams();
+  return (
     <RequireAuth>
-      <Layout me={me}>
-        <AssignmentView
-          me={me}
-          data={data}
-          error={error}
-          busy={busy}
-          groupName={groupName}
-          setGroupName={setGroupName}
-          onReload={load}
-          setError={setError}
-          setBusy={setBusy}
-        />
-      </Layout>
+      <InviteRouteBody
+        me={me}
+        deps={[token]}
+        load={async () => {
+          if (!token) throw new Error("Manglende invite-token");
+          return api<AssignmentPayload>(`/assignments/by-invite/${token}`);
+        }}
+      />
     </RequireAuth>
   );
 }
 
 export function SyncedSlugInvitePage({ me }: { me: Me | null }) {
   const { slug } = useParams();
-  const [data, setData] = useState<AssignmentPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [groupName, setGroupName] = useState("");
-
-  async function load() {
-    if (!slug) return;
-    const res = await api<AssignmentPayload>(`/assignments/${slug}`);
-    setData(res);
-  }
-
-  useEffect(() => {
-    void load().catch((e) => setError(e instanceof Error ? e.message : "Fejl"));
-  }, [slug]);
-
   return (
     <RequireAuth>
-      <Layout me={me}>
-        <AssignmentView
-          me={me}
-          data={data}
-          error={error}
-          busy={busy}
-          groupName={groupName}
-          setGroupName={setGroupName}
-          onReload={load}
-          setError={setError}
-          setBusy={setBusy}
-        />
-      </Layout>
+      <InviteRouteBody
+        me={me}
+        deps={[slug]}
+        load={async () => {
+          if (!slug) throw new Error("Manglende slug");
+          return api<AssignmentPayload>(`/assignments/${slug}`);
+        }}
+      />
     </RequireAuth>
   );
 }
