@@ -58,12 +58,11 @@ services:
       - internal
       - dokploy-network
     labels:
+      # Cloudflare tunnel → Traefik :80 (web). TLS termineres i Cloudflare — ikke websecure her.
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
       - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.rule=Host(`${TRAEFIK_HOST:-github.mercantec.tech}`)
-      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.entrypoints=${TRAEFIK_ENTRYPOINTS:-websecure}
-      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.tls=true
-      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.entrypoints=${TRAEFIK_ENTRYPOINTS:-web}
       - traefik.http.services.${TRAEFIK_ROUTER:-ghc}.loadbalancer.server.port=3000
 
 volumes:
