@@ -667,6 +667,9 @@ textarea {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .assignment-list li {
@@ -685,6 +688,106 @@ textarea {
 .assignment-list li:last-child {
   border-bottom: none;
   padding-bottom: 0;
+}
+
+.assignment-list > .asg-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.7rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 251, 0.65));
+  box-shadow: none;
+}
+
+.assignment-list > .asg-item:first-child,
+.assignment-list > .asg-item:last-child {
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.asg-item-top {
+  min-width: 0;
+}
+
+.asg-item-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.55rem;
+  margin-bottom: 0.3rem;
+}
+
+.asg-item-heading .asg-title-link {
+  font-size: 1.02rem;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.asg-item-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.asg-item-meta .mono {
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.asg-item-invite {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.45rem 0.55rem 0.45rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.asg-item-invite-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.asg-item-path {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.86rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.asg-item-copy {
+  white-space: nowrap;
+}
+
+.asg-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.asg-item-actions .btn {
+  flex: 0 0 auto;
+}
+
+.asg-item-actions .btn-danger-ghost {
+  margin-left: auto;
 }
 
 .asg-title-link {

@@ -876,7 +876,7 @@ export function TeacherPage({ me }: { me: Me | null }) {
                   <div className="section-head">
                     <div>
                       <h2>Assignments</h2>
-                      <p>Del invite-linket med eleverne.</p>
+                      <p>Kopiér invite-stien, eller åbn dashboard for aktivitet og redigering.</p>
                     </div>
                     <span className="step">{orgAssignments.length}</span>
                   </div>
@@ -886,40 +886,51 @@ export function TeacherPage({ me }: { me: Me | null }) {
                     <ul className="assignment-list">
                       {orgAssignments.map((a) => {
                         const link = `${webOrigin}/a/${a.slug}`;
+                        const shortPath = `/a/${a.slug}`;
                         return (
-                          <li key={a.id}>
-                            <div className="assignment-main">
-                              <div className="row" style={{ gap: "0.5rem", marginBottom: "0.25rem" }}>
-                                <Link className="list-title asg-title-link" to={`/teacher/assignments/${a.id}`}>
+                          <li key={a.id} className="asg-item">
+                            <div className="asg-item-top">
+                              <div className="asg-item-heading">
+                                <Link
+                                  className="list-title asg-title-link"
+                                  to={`/teacher/assignments/${a.id}`}
+                                >
                                   {a.title}
                                 </Link>
                                 <span className={`tag tag-${a.mode}`}>
                                   {a.mode === "group" ? "Gruppe" : "Individuel"}
                                 </span>
                               </div>
-                              <div className="muted mono">
-                                {a.templateRepo} · {a.enrollmentCount} tilmeldt
-                                {a.mode === "group" ? ` · ${a.groupCount} grupper` : ""}
-                              </div>
-                              <div className="invite-link">
-                                <GitHubMark size={12} />
-                                <code>
-                                  <Link to={`/a/${a.slug}`}>{link}</Link>
-                                </code>
-                              </div>
+                              <p className="asg-item-meta">
+                                <span className="mono">{a.templateRepo}</span>
+                                <span aria-hidden="true">·</span>
+                                <span>
+                                  {a.enrollmentCount} tilmeldt
+                                  {a.mode === "group" ? ` · ${a.groupCount} grupper` : ""}
+                                </span>
+                              </p>
                             </div>
-                            <div className="my-repo-actions">
-                              <Link className="btn btn-sm" to={`/teacher/assignments/${a.id}`}>
-                                Dashboard
-                              </Link>
+
+                            <div className="asg-item-invite">
+                              <span className="asg-item-invite-label">Invite</span>
+                              <code className="asg-item-path mono" title={link}>
+                                {shortPath}
+                              </code>
                               <button
                                 type="button"
-                                className="btn btn-ghost btn-sm"
+                                className="btn btn-ghost btn-sm asg-item-copy"
                                 onClick={() => void copyInvite(a.slug, a.id)}
+                                aria-label={`Kopiér invite-link for ${a.title}`}
                               >
                                 <CopyIcon />
                                 {copied === a.id ? "Kopieret" : "Kopiér"}
                               </button>
+                            </div>
+
+                            <div className="asg-item-actions">
+                              <Link className="btn btn-sm" to={`/teacher/assignments/${a.id}`}>
+                                Åbn dashboard
+                              </Link>
                               <button
                                 type="button"
                                 className="btn btn-danger-ghost btn-sm"
