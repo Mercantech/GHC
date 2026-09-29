@@ -34,7 +34,7 @@ services:
       MERCANTEC_TOKEN_URL: ${MERCANTEC_TOKEN_URL:-https://auth.mercantec.tech/oauth/token}
       MERCANTEC_CLIENT_ID: ${MERCANTEC_CLIENT_ID:-ghc}
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
-      WEB_ORIGIN: ${WEB_ORIGIN:-https://ghc.mercantec.tech}
+      WEB_ORIGIN: ${WEB_ORIGIN:-https://github.mercantec.tech}
       TEACHER_ROLES: ${TEACHER_ROLES:-teacher,admin}
     networks:
       - internal
@@ -49,8 +49,8 @@ services:
         VITE_MERCANTEC_AUTHORIZE_URL: ${MERCANTEC_AUTHORIZE_URL:-https://auth.mercantec.tech/oauth/authorize}
         VITE_MERCANTEC_TOKEN_URL: ${MERCANTEC_TOKEN_URL:-https://auth.mercantec.tech/oauth/token}
         VITE_MERCANTEC_SIGNOUT_URL: ${MERCANTEC_SIGNOUT_URL:-https://auth.mercantec.tech/signout}
-        VITE_REDIRECT_URI: ${REDIRECT_URI:-https://ghc.mercantec.tech/auth/callback}
-        VITE_WEB_ORIGIN: ${WEB_ORIGIN:-https://ghc.mercantec.tech}
+        VITE_REDIRECT_URI: ${REDIRECT_URI:-https://github.mercantec.tech/auth/callback}
+        VITE_WEB_ORIGIN: ${WEB_ORIGIN:-https://github.mercantec.tech}
     restart: unless-stopped
     depends_on:
       - api
@@ -60,7 +60,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
-      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.rule=Host(`${TRAEFIK_HOST:-ghc.mercantec.tech}`)
+      - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.rule=Host(`${TRAEFIK_HOST:-github.mercantec.tech}`)
       - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.entrypoints=${TRAEFIK_ENTRYPOINTS:-websecure}
       - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.tls=true
       - traefik.http.routers.${TRAEFIK_ROUTER:-ghc}.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
