@@ -1,22 +1,26 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { handleCallback } from "../auth";
 import { Layout } from "../components";
 
 export function CallbackPage() {
-  const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const started = useRef(false);
 
   useEffect(() => {
+    // StrictMode kører effects to gange i dev — kun start én gang pr. mount-cyklus.
+    if (started.current) return;
+    started.current = true;
+
     void (async () => {
       try {
         const returnTo = await handleCallback(window.location.search);
-        navigate(returnTo, { replace: true });
+        // Fuld navigation så App/useMe monteres med tokens allerede i sessionStorage.
+        window.location.replace(returnTo);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Login fejlede");
       }
     })();
-  }, [navigate]);
+  }, []);
 
   return (
     <Layout>

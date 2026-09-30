@@ -15,6 +15,28 @@ const SK_STATE = "ghc_oauth_state";
 const SK_ACCESS = "ghc_access_token";
 const SK_REFRESH = "ghc_refresh_token";
 const SK_EXPIRES = "ghc_expires_at";
+const SK_RETURN = "ghc_return_to";
+
+type AuthListener = () => void;
+const authListeners = new Set<AuthListener>();
+
+/** Kald når tokens gemmes/ryddes, så UI kan genindlæse profil. */
+export function onAuthChange(listener: AuthListener): () => void {
+  authListeners.add(listener);
+  return () => {
+    authListeners.delete(listener);
+  };
+}
+
+function notifyAuthChange(): void {
+  for (const listener of authListeners) {
+    try {
+      listener();
+    } catch {
+      // ignore listener errors
+    }
+  }
+}
 
 function base64UrlEncode(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -43,6 +65,7 @@ export function clearTokens(): void {
   sessionStorage.removeItem(SK_ACCESS);
   sessionStorage.removeItem(SK_REFRESH);
   sessionStorage.removeItem(SK_EXPIRES);
+  notifyAuthChange();
 }
 
 function storeTokens(data: {
@@ -56,6 +79,7 @@ function storeTokens(data: {
   }
   const expiresIn = data.expires_in ?? 900;
   sessionStorage.setItem(SK_EXPIRES, String(Date.now() + expiresIn * 1000));
+  notifyAuthChange();
 }
 
 export async function beginLogin(returnTo?: string): Promise<void> {
@@ -64,7 +88,7 @@ export async function beginLogin(returnTo?: string): Promise<void> {
   const state = randomString(32);
   sessionStorage.setItem(SK_VERIFIER, verifier);
   sessionStorage.setItem(SK_STATE, state);
-  if (returnTo) sessionStorage.setItem("ghc_return_to", returnTo);
+  if (returnTo) sessionStorage.setItem(SK_RETURN, returnTo);
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -75,49 +99,68 @@ export async function beginLogin(returnTo?: string): Promise<void> {
     code_challenge_method: "S256",
   });
 
-  window.location.href = `${AUTHORIZE_URL}?${params.toString()}`;
+  window.location.assign(`${AUTHORIZE_URL}?${params.toString()}`);
 }
 
+/** Undgå dobbelt token-exchange (React StrictMode / dobbelt mount). */
+let callbackInflight: Promise<string> | null = null;
+
 export async function handleCallback(search: string): Promise<string> {
-  const params = new URLSearchParams(search);
-  const code = params.get("code");
-  const state = params.get("state");
-  const savedState = sessionStorage.getItem(SK_STATE);
-  const verifier = sessionStorage.getItem(SK_VERIFIER);
+  if (callbackInflight) return callbackInflight;
 
-  if (!code || !state || !savedState || state !== savedState || !verifier) {
-    throw new Error("Ugyldig OAuth-callback (state/code)");
+  callbackInflight = (async () => {
+    const params = new URLSearchParams(search);
+    const code = params.get("code");
+    const state = params.get("state");
+    const savedState = sessionStorage.getItem(SK_STATE);
+    const verifier = sessionStorage.getItem(SK_VERIFIER);
+
+    if (!code || !state || !savedState || state !== savedState || !verifier) {
+      // Allerede udvekslet i denne session? Tokens findes → send videre.
+      if (getAccessToken()) {
+        return sessionStorage.getItem(SK_RETURN) ?? "/";
+      }
+      throw new Error("Ugyldig OAuth-callback (state/code)");
+    }
+
+    const body = new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: REDIRECT_URI,
+      client_id: CLIENT_ID,
+      code_verifier: verifier,
+    });
+
+    const res = await fetch(TOKEN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Token-udveksling fejlede: ${text}`);
+    }
+
+    const data = (await res.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+    };
+    storeTokens(data);
+    sessionStorage.removeItem(SK_VERIFIER);
+    sessionStorage.removeItem(SK_STATE);
+
+    const returnTo = sessionStorage.getItem(SK_RETURN) ?? "/";
+    sessionStorage.removeItem(SK_RETURN);
+    return returnTo;
+  })();
+
+  try {
+    return await callbackInflight;
+  } finally {
+    callbackInflight = null;
   }
-
-  const body = new URLSearchParams({
-    grant_type: "authorization_code",
-    code,
-    redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
-    code_verifier: verifier,
-  });
-
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Token-udveksling fejlede: ${text}`);
-  }
-
-  const data = (await res.json()) as {
-    access_token: string;
-    refresh_token?: string;
-    expires_in?: number;
-  };
-  storeTokens(data);
-  sessionStorage.removeItem(SK_VERIFIER);
-  sessionStorage.removeItem(SK_STATE);
-
-  return sessionStorage.getItem("ghc_return_to") ?? "/";
 }
 
 async function refreshTokens(): Promise<string | null> {
@@ -162,7 +205,7 @@ export async function getValidAccessToken(): Promise<string | null> {
 export function logout(): void {
   clearTokens();
   const returnUrl = encodeURIComponent(WEB_ORIGIN + "/");
-  window.location.href = `${SIGNOUT_URL}?returnUrl=${returnUrl}`;
+  window.location.assign(`${SIGNOUT_URL}?returnUrl=${returnUrl}`);
 }
 
 export function isLoggedIn(): boolean {

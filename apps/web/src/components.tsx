@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { api } from "./api";
-import { beginLogin, isLoggedIn, logout } from "./auth";
+import { beginLogin, isLoggedIn, logout, onAuthChange } from "./auth";
 import { GitHubMark } from "./icons";
 
 export type Me = {
@@ -15,10 +15,55 @@ export type Me = {
 
 export function useMe() {
   const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => isLoggedIn());
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function reload() {
+      if (!isLoggedIn()) {
+        if (!cancelled) {
+          setMe(null);
+          setError(null);
+          setLoading(false);
+        }
+        return;
+      }
+      if (!cancelled) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const data = await api<Me>("/me");
+        if (!cancelled) setMe(data);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Kunne ikke hente profil");
+          setMe(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void reload();
+    const unsubscribe = onAuthChange(() => {
+      void reload();
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
   const reload = async () => {
+    if (!isLoggedIn()) {
+      setMe(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -31,14 +76,6 @@ export function useMe() {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      setLoading(false);
-      return;
-    }
-    void reload();
-  }, []);
 
   return { me, loading, error, reload, setMe };
 }
@@ -134,7 +171,13 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 export function RequireTeacher({ me, children }: { me: Me | null; children: ReactNode }) {
-  if (!me) return null;
+  if (!me) {
+    return (
+      <Layout>
+        <p className="muted">Henter profil…</p>
+      </Layout>
+    );
+  }
   if (!me.isTeacher) {
     return <Navigate to="/" replace />;
   }
