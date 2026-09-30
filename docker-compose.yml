@@ -39,6 +39,7 @@ services:
     networks:
       - internal
 
+
   web:
     build:
       context: ./apps/web
