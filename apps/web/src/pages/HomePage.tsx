@@ -7,8 +7,10 @@ import { GitHubMark } from "../icons";
 
 type MyRepo = {
   enrollmentId: string;
-  fullName: string;
-  htmlUrl: string;
+  fullName: string | null;
+  htmlUrl: string | null;
+  status: "pending" | "active" | "failed" | string;
+  errorMessage: string | null;
   acceptedAt: string;
   assignment: {
     id: string;
@@ -31,6 +33,13 @@ function formatAccepted(iso: string): string {
   });
 }
 
+function statusMeta(status: string): { label: string; className: string } {
+  if (status === "active") return { label: "Aktiv", className: "tag-ok" };
+  if (status === "failed") return { label: "Fejlet — genåbn", className: "tag-warn" };
+  if (status === "pending") return { label: "Afventer", className: "tag-idle" };
+  return { label: status, className: "tag-idle" };
+}
+
 export function HomePage({
   me,
   loading,
@@ -48,8 +57,8 @@ export function HomePage({
   const [reposLoading, setReposLoading] = useState(false);
 
   useEffect(() => {
-    setGithubLogin(me?.githubLogin ?? "");
-  }, [me?.githubLogin]);
+    setGithubLogin(me?.githubLogin ?? me?.suggestedGithubLogin ?? "");
+  }, [me?.githubLogin, me?.suggestedGithubLogin]);
 
   useEffect(() => {
     if (!me) {
@@ -74,6 +83,26 @@ export function HomePage({
         body: JSON.stringify({ githubLogin }),
       });
       setMsg("GitHub-brugernavn gemt");
+      onGithubSaved();
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Kunne ikke gemme");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function applySuggestedGithub() {
+    if (!me?.suggestedGithubLogin) return;
+    setGithubLogin(me.suggestedGithubLogin);
+    setSaving(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      await api("/me/github", {
+        method: "PATCH",
+        body: JSON.stringify({ githubLogin: me.suggestedGithubLogin }),
+      });
+      setMsg(`Gemt @${me.suggestedGithubLogin} fra Mercantec Auth`);
       onGithubSaved();
     } catch (error) {
       setErr(error instanceof Error ? error.message : "Kunne ikke gemme");
@@ -116,69 +145,83 @@ export function HomePage({
             <h1>Hej {me.name?.split(" ")[0] ?? ""}</h1>
             <p>
               {me.isTeacher
-                ? "Se dine egne repos, eller åbn underviser-dashboardet."
-                : "Her ser du de repos, du har fået via GHC."}
+                ? "Se dine egne opgaver, eller åbn underviser-dashboardet."
+                : "Her ser du status på de opgaver, du har via GHC."}
             </p>
           </section>
 
           <section className="section" style={{ gridColumn: "1 / -1" }}>
             <div className="section-head">
               <div>
-                <h2>Mine repos</h2>
-                <p>Opgaver du har accepteret gennem systemet.</p>
+                <h2>Mine opgaver</h2>
+                <p>Aktiv, afventer eller fejlet — genåbn via invite-linket ved fejl.</p>
               </div>
               <span className="step">{repos.length || "0"}</span>
             </div>
 
             {reposLoading ? (
-              <p className="muted">Henter dine repos…</p>
+              <p className="muted">Henter dine opgaver…</p>
             ) : repos.length === 0 ? (
               <p className="muted">
-                Du har ingen repos endnu. Åbn et invite-link fra din underviser for at komme i
+                Du har ingen opgaver endnu. Åbn et invite-link fra din underviser for at komme i
                 gang.
               </p>
             ) : (
               <ul className="my-repos">
-                {repos.map((r) => (
-                  <li key={r.enrollmentId}>
-                    <div className="my-repo-main">
-                      <div className="row" style={{ gap: "0.5rem", marginBottom: "0.3rem" }}>
-                        <span className="list-title">{r.assignment.title}</span>
-                        <span className={`tag tag-${r.assignment.mode}`}>
-                          {r.assignment.mode === "group" ? "Gruppe" : "Individuel"}
-                        </span>
+                {repos.map((r) => {
+                  const st = statusMeta(r.status);
+                  return (
+                    <li key={r.enrollmentId}>
+                      <div className="my-repo-main">
+                        <div className="row" style={{ gap: "0.5rem", marginBottom: "0.3rem" }}>
+                          <span className="list-title">{r.assignment.title}</span>
+                          <span className={`tag tag-${r.assignment.mode}`}>
+                            {r.assignment.mode === "group" ? "Gruppe" : "Individuel"}
+                          </span>
+                          <span className={`tag ${st.className}`}>{st.label}</span>
+                        </div>
+                        <div className="muted">
+                          {r.assignment.orgName}
+                          {r.groupName ? ` · ${r.groupName}` : ""}
+                          {r.acceptedAt ? ` · ${formatAccepted(r.acceptedAt)}` : ""}
+                        </div>
+                        {r.errorMessage && <div className="dash-error">{r.errorMessage}</div>}
+                        {r.htmlUrl && r.fullName && (
+                          <a
+                            className="my-repo-link"
+                            href={r.htmlUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <GitHubMark size={14} />
+                            <span className="mono">{r.fullName}</span>
+                          </a>
+                        )}
                       </div>
-                      <div className="muted">
-                        {r.assignment.orgName}
-                        {r.groupName ? ` · ${r.groupName}` : ""}
-                        {r.acceptedAt ? ` · ${formatAccepted(r.acceptedAt)}` : ""}
+                      <div className="my-repo-actions">
+                        {r.status === "active" && r.htmlUrl && (
+                          <a
+                            className="btn btn-github btn-sm"
+                            href={r.htmlUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <GitHubMark size={14} />
+                            Åbn
+                          </a>
+                        )}
+                        {r.status === "failed" && (
+                          <Link className="btn btn-sm" to={`/a/${r.assignment.slug}`}>
+                            Genåbn
+                          </Link>
+                        )}
+                        <Link className="btn btn-ghost btn-sm" to={`/a/${r.assignment.slug}`}>
+                          Opgave
+                        </Link>
                       </div>
-                      <a
-                        className="my-repo-link"
-                        href={r.htmlUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <GitHubMark size={14} />
-                        <span className="mono">{r.fullName}</span>
-                      </a>
-                    </div>
-                    <div className="my-repo-actions">
-                      <a
-                        className="btn btn-github btn-sm"
-                        href={r.htmlUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <GitHubMark size={14} />
-                        Åbn
-                      </a>
-                      <Link className="btn btn-ghost btn-sm" to={`/a/${r.assignment.slug}`}>
-                        Opgave
-                      </Link>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -205,10 +248,33 @@ export function HomePage({
               </div>
               <GitHubMark size={22} />
             </div>
+
+            {me.suggestedGithubLogin && !me.githubLogin && (
+              <div className="github-suggest">
+                <p>
+                  Mercantec Auth foreslår{" "}
+                  <strong className="mono">@{me.suggestedGithubLogin}</strong>
+                  {me.loginMethod === "github" ? " (fra dit GitHub-login)" : ""}.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={saving}
+                  onClick={() => void applySuggestedGithub()}
+                >
+                  Brug forslag
+                </button>
+              </div>
+            )}
+
             <form className="stack" onSubmit={(e) => void saveGithub(e)}>
               <Field
                 label="GitHub-brugernavn"
-                hint="uden @"
+                hint={
+                  me.suggestedGithubLogin && !me.githubLogin
+                    ? "fra Auth — kan ændres"
+                    : "uden @"
+                }
                 prefix={<GitHubMark size={14} />}
               >
                 <input

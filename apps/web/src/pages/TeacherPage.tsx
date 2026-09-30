@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Field, Layout, RequireTeacher, type Me } from "../components";
+import { InviteShare } from "../components/InviteShare";
 import { RepoPicker } from "../components/RepoPicker";
-import { CopyIcon, GitHubMark } from "../icons";
+import { GitHubMark } from "../icons";
 
 type Org = { id: string; name: string; githubOrg: string };
 type Roster = { id: string; name: string; memberCount: number };
@@ -80,7 +81,6 @@ export function TeacherPage({ me }: { me: Me | null }) {
   const [reposLoading, setReposLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [editOrgName, setEditOrgName] = useState("");
   const [editOrgToken, setEditOrgToken] = useState("");
@@ -244,13 +244,20 @@ export function TeacherPage({ me }: { me: Me | null }) {
 
   async function deleteOrg() {
     if (!selectedOrg || !activeOrg) return;
-    const ok = window.confirm(
-      `Slet organisation “${activeOrg.name}”? Alle assignments og rosters under den slettes også.`,
+    const typed = window.prompt(
+      `Slet organisation “${activeOrg.name}” (@${activeOrg.githubOrg})?\n\nAlle assignments og rosters under den slettes også.\n\nSkriv GitHub-org-navnet præcist for at bekræfte:`,
     );
-    if (!ok) return;
+    if (typed == null) return;
+    if (typed.trim().toLowerCase() !== activeOrg.githubOrg.toLowerCase()) {
+      setError(`Sletning annulleret — du skulle skrive “${activeOrg.githubOrg}”`);
+      return;
+    }
     setError(null);
     try {
-      await api(`/orgs/${selectedOrg}`, { method: "DELETE" });
+      await api(`/orgs/${selectedOrg}`, {
+        method: "DELETE",
+        body: JSON.stringify({ confirmGithubOrg: typed.trim() }),
+      });
       setSelectedOrg("");
       setInfo("Organisation slettet");
       await load();
@@ -348,25 +355,18 @@ export function TeacherPage({ me }: { me: Me | null }) {
           enforceRoster: Boolean(rosterId),
         }),
       });
-      setInfo(`Assignment oprettet. Del invite-linket nedenfor.`);
+      const link = `${webOrigin}/a/${res.assignment.slug}`;
+      setInfo(`Assignment oprettet. Invite-link kopieret: ${link}`);
       setTitle("");
       setInviteSlug("");
       setSlugTouched(false);
       setTemplateRepo("");
       await load();
       if (selectedOrg) void loadDashboard(selectedOrg);
-      const link = `${webOrigin}/a/${res.assignment.slug}`;
       await navigator.clipboard.writeText(link).catch(() => undefined);
-      setCopied(res.assignment.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Kunne ikke oprette assignment");
     }
-  }
-
-  async function copyInvite(slug: string, id: string) {
-    const link = `${webOrigin}/a/${slug}`;
-    await navigator.clipboard.writeText(link);
-    setCopied(id);
   }
 
   const orgAssignments = assignments.filter((a) => !selectedOrg || a.org.id === selectedOrg);
@@ -393,12 +393,12 @@ export function TeacherPage({ me }: { me: Me | null }) {
             </div>
             <div className="teacher-orgbar">
               <label>
-                <span>Organisation</span>
+                <span>Classroom-org (elev-repos)</span>
                 <select value={selectedOrg} onChange={(e) => setSelectedOrg(e.target.value)}>
                   <option value="">Vælg organisation…</option>
                   {orgs.map((o) => (
                     <option key={o.id} value={o.id}>
-                      {o.name} (@{o.githubOrg})
+                      {o.name} · @{o.githubOrg}
                     </option>
                   ))}
                 </select>
@@ -431,11 +431,17 @@ export function TeacherPage({ me }: { me: Me | null }) {
 
               {activeOrg && (
                 <form className="stack" onSubmit={(e) => void updateOrg(e)} style={{ marginBottom: "1.5rem" }}>
-                  <p className="muted mono" style={{ margin: 0 }}>
-                    @{activeOrg.githubOrg}
-                  </p>
+                  <div className="org-lock-card">
+                    <span className="asg-flow-label">GitHub-org (låst)</span>
+                    <strong className="mono">@{activeOrg.githubOrg}</strong>
+                    <p className="muted" style={{ margin: "0.35rem 0 0", fontSize: "0.85rem" }}>
+                      Kan ikke ændres — opret en ny organisation hvis du skal pege på en anden
+                      GitHub-org. Den valgte org er classroom (elev-repos). Template vælges separat
+                      under “Ny assignment”.
+                    </p>
+                  </div>
                   <div className="grid-2">
-                    <Field label="Visningsnavn">
+                    <Field label="Visningsnavn" hint="kun i GHC">
                       <input
                         value={editOrgName}
                         onChange={(e) => setEditOrgName(e.target.value)}
@@ -461,7 +467,7 @@ export function TeacherPage({ me }: { me: Me | null }) {
                       className="btn btn-danger-ghost"
                       onClick={() => void deleteOrg()}
                     >
-                      Slet organisation
+                      Slet organisation…
                     </button>
                   </div>
                   <div className="teacher-divider" />
@@ -479,11 +485,11 @@ export function TeacherPage({ me }: { me: Me | null }) {
                       required
                     />
                   </Field>
-                  <Field label="GitHub org" hint="login-navn" prefix={<GitHubMark size={14} />}>
+                  <Field label="GitHub org" hint="låst efter oprettelse" prefix={<GitHubMark size={14} />}>
                     <input
                       value={githubOrg}
                       onChange={(e) => setGithubOrg(e.target.value)}
-                      placeholder="Mercantech"
+                      placeholder="Mercantec-GHC"
                       required
                     />
                   </Field>
@@ -978,21 +984,7 @@ export function TeacherPage({ me }: { me: Me | null }) {
                               </p>
                             </div>
 
-                            <div className="asg-item-invite">
-                              <span className="asg-item-invite-label">Invite</span>
-                              <code className="asg-item-path mono" title={link}>
-                                {shortPath}
-                              </code>
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm asg-item-copy"
-                                onClick={() => void copyInvite(a.slug, a.id)}
-                                aria-label={`Kopiér invite-link for ${a.title}`}
-                              >
-                                <CopyIcon />
-                                {copied === a.id ? "Kopieret" : "Kopiér"}
-                              </button>
-                            </div>
+                            <InviteShare inviteUrl={link} shortPath={shortPath} compact />
 
                             <div className="asg-item-actions">
                               <Link className="btn btn-sm" to={`/teacher/assignments/${a.id}`}>

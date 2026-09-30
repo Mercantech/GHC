@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Field, Layout, RequireTeacher, type Me } from "../components";
-import { CopyIcon, GitHubMark } from "../icons";
+import { InviteShare } from "../components/InviteShare";
+import { GitHubMark } from "../icons";
 
 type AssignmentDetail = {
   id: string;
@@ -95,7 +96,6 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
   const [info, setInfo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "idle">("all");
-  const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editSlug, setEditSlug] = useState("");
@@ -141,13 +141,6 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
       return true;
     });
   }, [repos, activityFilter]);
-
-  async function copyInvite() {
-    if (!inviteLink) return;
-    await navigator.clipboard.writeText(inviteLink);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
-  }
 
   async function saveAssignment(e: FormEvent) {
     e.preventDefault();
@@ -244,15 +237,12 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                 <div className="asg-hero-actions">
                   <div className="asg-invite-box">
                     <span>Invite-link</span>
-                    <code className="mono">
-                      <Link to={`/a/${assignment.slug}`}>{inviteLink}</Link>
-                    </code>
+                    <InviteShare
+                      inviteUrl={inviteLink}
+                      shortPath={`/a/${assignment.slug}`}
+                    />
                   </div>
                   <div className="row">
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void copyInvite()}>
-                      <CopyIcon />
-                      {copied ? "Kopieret" : "Kopiér link"}
-                    </button>
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"

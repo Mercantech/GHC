@@ -9,6 +9,8 @@ export type Me = {
   name?: string | null;
   email?: string | null;
   githubLogin?: string | null;
+  suggestedGithubLogin?: string | null;
+  loginMethod?: string | null;
   roles: string[];
   isTeacher: boolean;
 };

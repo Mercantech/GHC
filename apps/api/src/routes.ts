@@ -37,12 +37,15 @@ export const routes: FastifyPluginAsync = async (app) => {
   app.get("/me", async (request) => {
     const dbUser = await prisma.user.findUniqueOrThrow({ where: { sub: request.user!.sub } });
     const teacher = await resolveIsTeacher(request.user!, dbUser.githubLogin);
+    const fromAuth = request.user!.githubLogin ?? null;
     return {
       sub: dbUser.sub,
       name: dbUser.name,
       email: dbUser.email,
       githubLogin: dbUser.githubLogin,
       githubId: dbUser.githubId,
+      suggestedGithubLogin: !dbUser.githubLogin ? fromAuth : null,
+      loginMethod: request.user!.loginMethod ?? null,
       roles: request.user!.roles,
       isTeacher: teacher,
     };
@@ -71,13 +74,11 @@ export const routes: FastifyPluginAsync = async (app) => {
     };
   });
 
-  /** Repos the current user has accepted via GHC. */
+  /** Repos/opgaver den aktuelle bruger har via GHC (alle statusser). */
   app.get("/me/repos", async (request) => {
     const enrollments = await prisma.enrollment.findMany({
       where: {
         userId: request.user!.sub,
-        status: "active",
-        githubRepoFullName: { not: null },
       },
       include: {
         assignment: {
@@ -97,9 +98,10 @@ export const routes: FastifyPluginAsync = async (app) => {
     return {
       repos: enrollments.map((e) => ({
         enrollmentId: e.id,
-        fullName: e.githubRepoFullName!,
-        htmlUrl: `https://github.com/${e.githubRepoFullName}`,
+        fullName: e.githubRepoFullName,
+        htmlUrl: e.githubRepoFullName ? `https://github.com/${e.githubRepoFullName}` : null,
         status: e.status,
+        errorMessage: e.errorMessage,
         acceptedAt: e.updatedAt,
         assignment: {
           id: e.assignment.id,
@@ -198,10 +200,24 @@ export const routes: FastifyPluginAsync = async (app) => {
   app.delete("/orgs/:orgId", async (request, reply) => {
     if (!(await requireTeacher(request, reply))) return;
     const { orgId } = request.params as { orgId: string };
+    const body = z
+      .object({
+        confirmGithubOrg: z.string().min(1),
+      })
+      .parse(request.body ?? {});
+
     const org = await prisma.org.findFirst({
       where: { id: orgId, createdBySub: request.user!.sub },
+      include: { _count: { select: { assignments: true, rosters: true } } },
     });
     if (!org) return reply.code(404).send({ error: "Org not found" });
+
+    if (body.confirmGithubOrg.trim().toLowerCase() !== org.githubOrg.toLowerCase()) {
+      return reply.code(400).send({
+        error: `Skriv præcis GitHub-org “${org.githubOrg}” for at bekræfte sletning`,
+      });
+    }
+
     await prisma.org.delete({ where: { id: org.id } });
     return reply.code(204).send();
   });

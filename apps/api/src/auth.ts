@@ -7,6 +7,8 @@ export type AuthUser = {
   email?: string;
   roles: string[];
   loginMethod?: string;
+  /** GitHub-login fra JWT, når Auth har den (fx ved GitHub-login). */
+  githubLogin?: string;
 };
 
 declare module "fastify" {
@@ -43,6 +45,36 @@ function extractRoles(payload: JWTPayload): string[] {
   return [];
 }
 
+function asNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim().replace(/^@/, "");
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/** Prøv at finde GitHub-brugernavn i JWT-claims (Auth kan udvide claims over tid). */
+export function extractGithubLogin(payload: JWTPayload): string | undefined {
+  const direct =
+    asNonEmptyString(payload.github_login) ??
+    asNonEmptyString(payload.github_username) ??
+    asNonEmptyString(payload.github) ??
+    asNonEmptyString(payload["urn:github:login"]);
+  if (direct && !direct.includes(" ") && direct.length <= 39) return direct;
+
+  const loginMethod =
+    typeof payload.login_method === "string" ? payload.login_method.toLowerCase() : "";
+  if (loginMethod === "github") {
+    const preferred =
+      asNonEmptyString(payload.preferred_username) ?? asNonEmptyString(payload.nickname);
+    if (preferred && !preferred.includes(" ") && !preferred.includes("@") && preferred.length <= 39) {
+      return preferred;
+    }
+    // Sidste udvej: enkeltords name (GitHub-display kan være login)
+    const name = asNonEmptyString(payload.name);
+    if (name && !name.includes(" ") && name.length <= 39) return name;
+  }
+  return undefined;
+}
+
 export async function verifyAccessToken(token: string): Promise<AuthUser> {
   const issuer = process.env.MERCANTEC_ISSUER ?? "https://auth.mercantec.tech";
   const audience = process.env.MERCANTEC_AUDIENCE ?? "mercantec-apps";
@@ -63,6 +95,7 @@ export async function verifyAccessToken(token: string): Promise<AuthUser> {
     email: typeof payload.email === "string" ? payload.email : undefined,
     roles: extractRoles(payload),
     loginMethod: typeof payload.login_method === "string" ? payload.login_method : undefined,
+    githubLogin: extractGithubLogin(payload),
   };
 }
 

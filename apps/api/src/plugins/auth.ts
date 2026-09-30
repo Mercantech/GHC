@@ -21,16 +21,22 @@ const authPluginImpl: FastifyPluginAsync = async (app) => {
       const user = await verifyAccessToken(header.slice(7));
       request.user = user;
 
+      const existing = await prisma.user.findUnique({ where: { sub: user.sub } });
       await prisma.user.upsert({
         where: { sub: user.sub },
         create: {
           sub: user.sub,
           name: user.name,
           email: user.email,
+          ...(user.githubLogin ? { githubLogin: user.githubLogin } : {}),
         },
         update: {
           name: user.name,
           email: user.email,
+          // Autofyld kun hvis eleven endnu ikke har sat GitHub-login
+          ...(!existing?.githubLogin && user.githubLogin
+            ? { githubLogin: user.githubLogin }
+            : {}),
         },
       });
     } catch (err) {
