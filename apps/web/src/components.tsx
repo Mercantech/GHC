@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { beginLogin, isLoggedIn, logout, onAuthChange } from "./auth";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { BrandLogo, GitHubMark } from "./icons";
 
 export type Me = {
@@ -110,6 +111,7 @@ export function Layout({
           </Link>
         )}
         <div className="row">
+          <ThemeToggle />
           {me && (
             <div className="user-chip">
               <strong>{me.name ?? me.email ?? "Bruger"}</strong>

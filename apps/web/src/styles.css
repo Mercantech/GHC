@@ -5,10 +5,13 @@
   --paper: #e7eef6;
   --paper-2: #f4f7fb;
   --surface: #ffffff;
+  --surface-soft: rgba(255, 255, 255, 0.72);
+  --surface-strong: #ffffff;
   --line: #c8d4e3;
   --line-strong: #9fb0c4;
   --accent: #0b5fff;
   --accent-ink: #ffffff;
+  --accent-soft: #edf3ff;
   --github: #24292f;
   --ok: #1a7f37;
   --ok-bg: #e8f6ec;
@@ -20,6 +23,48 @@
   --mono: "IBM Plex Mono", ui-monospace, monospace;
   --shadow-field: inset 0 1px 2px rgba(11, 21, 38, 0.04);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --body-grad-a: rgba(244, 247, 251, 0.92);
+  --body-grad-b: rgba(231, 238, 246, 0.98);
+  --grid-line: rgba(11, 95, 255, 0.05);
+  --shell-landing-bg: linear-gradient(165deg, #f3f7fc 0%, #e8eef7 42%, #dfe8f4 100%);
+  --invite-atmos: linear-gradient(165deg, #f7fafd 0%, #e4ecf6 48%, #d9e5f4 100%);
+  --panel-grad: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 251, 0.65));
+  --focus-ring: rgba(11, 95, 255, 0.14);
+  --prefix-bg: rgba(11, 21, 38, 0.02);
+  --glow-a: rgba(11, 95, 255, 0.22);
+  --glow-b: rgba(15, 118, 110, 0.16);
+}
+
+html[data-theme="dark"] {
+  --ink: #e8eef8;
+  --ink-soft: #a8b7cc;
+  --muted: #7d8fa6;
+  --paper: #0c121c;
+  --paper-2: #151d2b;
+  --surface: #121a27;
+  --surface-soft: rgba(18, 26, 39, 0.82);
+  --surface-strong: #1a2435;
+  --line: #2a384c;
+  --line-strong: #3d5068;
+  --accent: #4d8fff;
+  --accent-ink: #061018;
+  --accent-soft: #15253f;
+  --github: #e8eef8;
+  --ok: #3ecf6a;
+  --ok-bg: #10281a;
+  --danger: #f07167;
+  --danger-bg: #2a1514;
+  --shadow-field: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+  --body-grad-a: rgba(12, 18, 28, 0.96);
+  --body-grad-b: rgba(10, 14, 22, 0.98);
+  --grid-line: rgba(77, 143, 255, 0.06);
+  --shell-landing-bg: linear-gradient(165deg, #0c121c 0%, #101826 42%, #0e1622 100%);
+  --invite-atmos: linear-gradient(165deg, #0d1420 0%, #111a28 48%, #0c131d 100%);
+  --panel-grad: linear-gradient(180deg, rgba(18, 26, 39, 0.95), rgba(15, 22, 34, 0.8));
+  --focus-ring: rgba(77, 143, 255, 0.22);
+  --prefix-bg: rgba(255, 255, 255, 0.03);
+  --glow-a: rgba(77, 143, 255, 0.18);
+  --glow-b: rgba(45, 160, 140, 0.12);
 }
 
 * {
@@ -39,11 +84,12 @@ body {
   line-height: 1.55;
   background-color: var(--paper);
   background-image:
-    linear-gradient(180deg, rgba(244, 247, 251, 0.92), rgba(231, 238, 246, 0.98)),
-    linear-gradient(rgba(11, 95, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 95, 255, 0.05) 1px, transparent 1px);
+    linear-gradient(180deg, var(--body-grad-a), var(--body-grad-b)),
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: auto, 28px 28px, 28px 28px;
   background-attachment: fixed;
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
 }
 
 a {
@@ -75,7 +121,7 @@ textarea {
   min-height: 100vh;
   padding: 0;
   margin: 0;
-  background: linear-gradient(165deg, #f3f7fc 0%, #e8eef7 42%, #dfe8f4 100%);
+  background: var(--shell-landing-bg);
 }
 
 .topbar {
@@ -302,8 +348,8 @@ textarea {
 
 .field-control:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(11, 95, 255, 0.14);
-  background: #fff;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  background: var(--surface-strong);
 }
 
 .field-prefix {
@@ -315,7 +361,7 @@ textarea {
   color: var(--muted);
   font-family: var(--mono);
   font-size: 0.85rem;
-  background: rgba(11, 21, 38, 0.02);
+  background: var(--prefix-bg);
 }
 
 .field input,
@@ -360,7 +406,7 @@ textarea {
 }
 
 .btn:hover {
-  background: #0047d6;
+  background: color-mix(in srgb, var(--accent) 82%, #000);
   text-decoration: none;
 }
 
@@ -482,15 +528,15 @@ textarea {
 }
 
 .tag-individual {
-  border-color: #b2ccff;
-  color: #0b5fff;
-  background: #edf3ff;
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .tag-template {
-  border-color: #9ec5ff;
-  color: #0b5fff;
-  background: #edf3ff;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .sr-only {
@@ -582,7 +628,7 @@ textarea {
 .teacher-panel {
   margin-bottom: 1.25rem;
   padding: 1.4rem 1.45rem 1.5rem;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-soft);
   border: 1px solid var(--line);
   border-radius: 16px;
   backdrop-filter: blur(8px);
@@ -715,7 +761,7 @@ textarea {
   padding: 0.95rem 1rem;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 251, 0.65));
+  background: var(--panel-grad);
   box-shadow: none;
 }
 
@@ -976,7 +1022,7 @@ textarea {
   padding: 0.75rem 0.9rem;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--surface-soft);
   width: 100%;
 }
 
@@ -1054,8 +1100,8 @@ textarea {
 .repo-picker-trigger:hover,
 .repo-picker-trigger.is-open {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(11, 95, 255, 0.12);
-  background: #fff;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  background: var(--surface-strong);
 }
 
 .repo-picker-value {
@@ -1094,8 +1140,8 @@ textarea {
   right: 0;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 18px 40px rgba(11, 21, 38, 0.12);
+  background: var(--surface-strong);
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--ink) 18%, transparent);
   overflow: hidden;
   animation: inviteIn 0.22s var(--ease) both;
 }
@@ -1115,7 +1161,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface);
   padding: 0.65rem 0.75rem;
   color: var(--ink);
   outline: none;
@@ -1125,7 +1171,7 @@ textarea {
 .repo-picker-search:focus,
 .repo-picker-manual input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(11, 95, 255, 0.12);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .repo-picker-list {
@@ -1411,9 +1457,9 @@ textarea {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 70% 55% at 12% 10%, rgba(11, 95, 255, 0.16), transparent 60%),
-    radial-gradient(ellipse 50% 45% at 92% 85%, rgba(11, 21, 38, 0.08), transparent 65%),
-    linear-gradient(165deg, #f7fafd 0%, #e4ecf6 48%, #d9e5f4 100%);
+    radial-gradient(ellipse 70% 55% at 12% 10%, var(--glow-a), transparent 60%),
+    radial-gradient(ellipse 50% 45% at 92% 85%, color-mix(in srgb, var(--ink) 8%, transparent), transparent 65%),
+    var(--invite-atmos);
 }
 
 .invite-grid {
@@ -1589,7 +1635,7 @@ textarea {
 .invite-groups-card {
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-soft);
   padding: 0.35rem 1rem;
 }
 
@@ -1605,18 +1651,6 @@ textarea {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.85rem;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 .invite-field {
@@ -1636,7 +1670,7 @@ textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--surface-soft);
   padding: 0.95rem 1rem;
   font-size: 1.05rem;
   color: var(--ink);
@@ -1646,7 +1680,7 @@ textarea {
 
 .invite-field input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(11, 95, 255, 0.14);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .invite-join-list {
@@ -1711,7 +1745,7 @@ textarea {
   padding: 0.28rem 0.55rem 0.28rem 0.28rem;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-soft);
   color: var(--ink);
   text-decoration: none;
   transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
@@ -1720,7 +1754,7 @@ textarea {
 .invite-member:hover {
   text-decoration: none;
   border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
-  background: #fff;
+  background: var(--surface-strong);
 }
 
 .invite-member-avatar {
@@ -1818,7 +1852,7 @@ textarea {
   height: min(58vw, 640px);
   right: -8%;
   top: -12%;
-  background: radial-gradient(circle, rgba(11, 95, 255, 0.22), transparent 68%);
+  background: radial-gradient(circle, var(--glow-a), transparent 68%);
   animation: landingDrift 14s var(--ease) infinite alternate;
 }
 
@@ -1827,7 +1861,7 @@ textarea {
   height: min(42vw, 420px);
   left: -6%;
   bottom: -8%;
-  background: radial-gradient(circle, rgba(15, 118, 110, 0.16), transparent 70%);
+  background: radial-gradient(circle, var(--glow-b), transparent 70%);
   animation: landingDrift 18s var(--ease) infinite alternate-reverse;
 }
 
@@ -1835,8 +1869,8 @@ textarea {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(11, 21, 38, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 21, 38, 0.045) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--ink) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--ink) 5%, transparent) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(ellipse 75% 65% at 50% 40%, #000 20%, transparent 85%);
 }
@@ -2151,9 +2185,27 @@ textarea {
 }
 
 .mode-toggle button[aria-pressed="true"] {
-  background: #fff;
+  background: var(--surface-strong);
   color: var(--ink);
-  box-shadow: 0 1px 2px rgba(11, 21, 38, 0.08);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.theme-toggle {
+  min-width: 2.25rem;
+  padding-inline: 0.55rem;
+}
+
+html[data-theme="dark"] .btn-github {
+  background: #e8eef8;
+  color: #0b1526;
+}
+
+html[data-theme="dark"] .btn-github:hover {
+  background: #fff;
+}
+
+html[data-theme="dark"] .brand-logo {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 
 .repo-link {
