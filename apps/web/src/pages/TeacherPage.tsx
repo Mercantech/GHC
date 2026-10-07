@@ -6,6 +6,32 @@ import { InviteShare } from "../components/InviteShare";
 import { RepoPicker } from "../components/RepoPicker";
 import { GitHubMark } from "../icons";
 
+const SK_CLASSROOM_ORG = "ghc_teacher_classroom_org";
+
+function readStoredClassroomOrgId(): string {
+  try {
+    return localStorage.getItem(SK_CLASSROOM_ORG) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function persistClassroomOrgId(id: string) {
+  try {
+    if (id) localStorage.setItem(SK_CLASSROOM_ORG, id);
+    else localStorage.removeItem(SK_CLASSROOM_ORG);
+  } catch {
+    /* fx privat browsing */
+  }
+}
+
+function resolveClassroomOrgId(current: string, orgList: Org[]): string {
+  if (current && orgList.some((o) => o.id === current)) return current;
+  const stored = readStoredClassroomOrgId();
+  if (stored && orgList.some((o) => o.id === stored)) return stored;
+  return orgList[0]?.id ?? "";
+}
+
 type Org = { id: string; name: string; githubOrg: string };
 type Roster = { id: string; name: string; memberCount: number };
 type Assignment = {
@@ -82,7 +108,12 @@ function formatRelativeDa(iso: string | null): string {
 export function TeacherPage({ me }: { me: Me | null }) {
   const [orgs, setOrgs] = useState<Org[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [selectedOrg, setSelectedOrg] = useState("");
+  const [selectedOrg, setSelectedOrgState] = useState(readStoredClassroomOrgId);
+
+  function setSelectedOrg(id: string) {
+    setSelectedOrgState(id);
+    persistClassroomOrgId(id);
+  }
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [repos, setRepos] = useState<Repo[]>([]);
   const [reposLoading, setReposLoading] = useState(false);
@@ -138,9 +169,11 @@ export function TeacherPage({ me }: { me: Me | null }) {
     ]);
     setOrgs(orgRes.orgs);
     setAssignments(asgRes.assignments);
-    if (!selectedOrg && orgRes.orgs[0]) {
-      setSelectedOrg(orgRes.orgs[0].id);
-    }
+    setSelectedOrgState((current) => {
+      const next = resolveClassroomOrgId(current, orgRes.orgs);
+      persistClassroomOrgId(next);
+      return next;
+    });
     if (orgRes.orgs.length === 0) setShowSetup(true);
   }
 
