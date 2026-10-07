@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { api } from "./api";
 import { beginLogin, isLoggedIn, logout, onAuthChange } from "./auth";
-import { GitHubMark } from "./icons";
+import { BrandLogo, GitHubMark } from "./icons";
 
 export type Me = {
   sub: string;
@@ -95,15 +95,18 @@ export function Layout({
     <div className={landing ? "shell shell-landing" : "shell"}>
       <header className={`topbar${landing ? " topbar-landing" : ""}`}>
         {landing ? (
-          <span className="landing-top-mark" aria-hidden="true">
-            G
+          <span className="brand brand-static">
+            <BrandLogo size={40} />
+            <span className="brand-wordmark">
+              G<span>HC</span>
+            </span>
           </span>
         ) : (
           <Link to="/" className="brand">
-            <span className="brand-mark">
-              <GitHubMark size={16} />
+            <BrandLogo size={40} />
+            <span className="brand-wordmark">
+              G<span>HC</span>
             </span>
-            G<em>HC</em>
           </Link>
         )}
         <div className="row">

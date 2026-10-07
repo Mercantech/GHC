@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api";
 import { beginLogin, isLoggedIn } from "../auth";
 import { Field, Layout, type Me } from "../components";
-import { GitHubMark } from "../icons";
+import { BrandLogo, GitHubMark } from "../icons";
 
 type MyRepo = {
   enrollmentId: string;
@@ -124,7 +124,10 @@ export function HomePage({
           <section className="landing-hero">
             <div className="landing-copy-block">
               <h1 className="landing-brand">
-                G<span>HC</span>
+                <BrandLogo size={112} className="landing-brand-logo" alt="" />
+                <span className="landing-brand-text">
+                  G<span>HC</span>
+                </span>
               </h1>
               <p className="landing-headline">Opgaver direkte i jeres GitHub-org.</p>
               <p className="landing-lead">

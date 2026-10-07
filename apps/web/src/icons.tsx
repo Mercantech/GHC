@@ -1,3 +1,24 @@
+export function BrandLogo({
+  className = "",
+  size = 36,
+  alt = "GHC",
+}: {
+  className?: string;
+  size?: number;
+  alt?: string;
+}) {
+  return (
+    <img
+      className={`brand-logo ${className}`.trim()}
+      src="/ghc-logo.png"
+      width={size}
+      height={size}
+      alt={alt}
+      decoding="async"
+    />
+  );
+}
+
 export function GitHubMark({ className = "", size = 20 }: { className?: string; size?: number }) {
   return (
     <svg
