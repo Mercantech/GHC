@@ -96,14 +96,14 @@ export function Layout({
       <header className={`topbar${landing ? " topbar-landing" : ""}`}>
         {landing ? (
           <span className="brand brand-static">
-            <BrandLogo size={40} />
+            <BrandLogo size={28} className="brand-logo-nav" />
             <span className="brand-wordmark">
               G<span>HC</span>
             </span>
           </span>
         ) : (
           <Link to="/" className="brand">
-            <BrandLogo size={40} />
+            <BrandLogo size={28} className="brand-logo-nav" />
             <span className="brand-wordmark">
               G<span>HC</span>
             </span>

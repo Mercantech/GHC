@@ -130,6 +130,11 @@ textarea {
   flex-shrink: 0;
 }
 
+.brand-logo-nav {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
 .brand-wordmark {
   display: inline-flex;
   align-items: baseline;
