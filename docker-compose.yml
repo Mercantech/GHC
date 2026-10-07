@@ -16,7 +16,8 @@ services:
     networks:
       - internal
 
-  api:
+  # Unikt servicenavn — undgår DNS-kollision med andre apps' `api` på dokploy-network
+  ghc-api:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
@@ -54,7 +55,7 @@ services:
         VITE_WEB_ORIGIN: ${WEB_ORIGIN:-https://ghc.mercantec.tech}
     restart: unless-stopped
     depends_on:
-      - api
+      - ghc-api
     networks:
       - internal
       - dokploy-network

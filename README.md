@@ -21,7 +21,7 @@ docker compose up -d --build
 
 - Kun **web** er på `dokploy-network` med Traefik (`Host` via `TRAEFIK_HOST`).
 - **api** + **db** er kun på internt netværk.
-- Browser kalder `/api/*` → nginx i web → `http://api:3000/*`.
+- Browser kalder `/api/*` → nginx i web → `http://ghc-api:3000/*`.
 
 Sæt pr. miljø: `WEB_ORIGIN`, `REDIRECT_URI`, `TOKEN_ENCRYPTION_KEY`, `MERCANTEC_CLIENT_ID`, `TRAEFIK_HOST`.
 

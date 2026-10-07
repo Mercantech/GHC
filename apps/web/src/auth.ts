@@ -17,6 +17,22 @@ const SK_REFRESH = "ghc_refresh_token";
 const SK_EXPIRES = "ghc_expires_at";
 const SK_RETURN = "ghc_return_to";
 
+function friendlyTokenError(status: number, body: string): string {
+  const trimmed = body.trim();
+  if (!trimmed || trimmed.startsWith("<") || /bad gateway/i.test(trimmed)) {
+    if (status === 502 || status === 503 || status === 504) {
+      return "API er midlertidigt utilgængelig (prøv igen om et øjeblik)";
+    }
+    return `Uventet svar fra serveren (HTTP ${status})`;
+  }
+  try {
+    const json = JSON.parse(trimmed) as { error?: string; error_description?: string; message?: string };
+    return json.error_description || json.message || json.error || `HTTP ${status}`;
+  } catch {
+    return trimmed.length > 180 ? `${trimmed.slice(0, 180)}…` : trimmed;
+  }
+}
+
 type AuthListener = () => void;
 const authListeners = new Set<AuthListener>();
 
@@ -139,7 +155,7 @@ export async function handleCallback(search: string): Promise<string> {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Token-udveksling fejlede: ${text}`);
+      throw new Error(`Token-udveksling fejlede: ${friendlyTokenError(res.status, text)}`);
     }
 
     const data = (await res.json()) as {
