@@ -262,67 +262,72 @@ function AssignmentView({
         {a.mode === "group" && (
           <div className="invite-group">
             {a.groups.length > 0 && (
-              <ul className="invite-join-list">
-                {a.groups.map((g) => {
-                  const members = g.members?.length ? g.members : [];
-                  const full =
-                    a.maxTeamSize != null && g.memberCount >= a.maxTeamSize;
-                  return (
-                    <li key={g.id}>
-                      <div className="invite-join-main">
-                        <div className="invite-join-head">
-                          <strong>{g.name}</strong>
-                          {(a.maxTeamSize || g.memberCount > 0) && (
-                            <span className="invite-join-meta">
-                              {g.memberCount}
-                              {a.maxTeamSize ? `/${a.maxTeamSize}` : ""}
-                            </span>
-                          )}
-                        </div>
-                        {members.length > 0 && (
-                          <ul className="invite-member-list">
-                            {members.map((m) => (
-                              <li key={m.githubLogin}>
-                                <a
-                                  className="invite-member"
-                                  href={m.htmlUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title={
-                                    m.name
-                                      ? `${m.name} (@${m.githubLogin})`
-                                      : `@${m.githubLogin}`
-                                  }
-                                >
-                                  <img
-                                    className="invite-member-avatar"
-                                    src={m.avatarUrl}
-                                    alt=""
-                                    width={28}
-                                    height={28}
-                                    loading="lazy"
-                                  />
-                                  <span className="invite-member-handle mono">
-                                    @{m.githubLogin}
-                                  </span>
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                      <button
-                        className="btn btn-ghost"
-                        type="button"
-                        disabled={busy || full}
-                        onClick={() => void joinGroup(g.id)}
-                      >
-                        {full ? "Fuld" : "Join"}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <div className="invite-groups-card">
+                  <ul className="invite-join-list">
+                    {a.groups.map((g) => {
+                      const members = g.members?.length ? g.members : [];
+                      const full =
+                        a.maxTeamSize != null && g.memberCount >= a.maxTeamSize;
+                      return (
+                        <li key={g.id}>
+                          <div className="invite-join-main">
+                            <div className="invite-join-head">
+                              <strong>{g.name}</strong>
+                              {(a.maxTeamSize || g.memberCount > 0) && (
+                                <span className="invite-join-meta">
+                                  {g.memberCount}
+                                  {a.maxTeamSize ? `/${a.maxTeamSize}` : ""}
+                                </span>
+                              )}
+                            </div>
+                            {members.length > 0 && (
+                              <ul className="invite-member-list">
+                                {members.map((m) => (
+                                  <li key={m.githubLogin}>
+                                    <a
+                                      className="invite-member"
+                                      href={m.htmlUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      title={
+                                        m.name
+                                          ? `${m.name} (@${m.githubLogin})`
+                                          : `@${m.githubLogin}`
+                                      }
+                                    >
+                                      <img
+                                        className="invite-member-avatar"
+                                        src={m.avatarUrl}
+                                        alt=""
+                                        width={28}
+                                        height={28}
+                                        loading="lazy"
+                                      />
+                                      <span className="invite-member-handle mono">
+                                        @{m.githubLogin}
+                                      </span>
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          <button
+                            className="btn btn-ghost"
+                            type="button"
+                            disabled={busy || full}
+                            onClick={() => void joinGroup(g.id)}
+                          >
+                            {full ? "Fuld" : "Join"}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+                <div className="invite-group-divider" aria-hidden="true" />
+              </>
             )}
 
             <form className="invite-create" onSubmit={(e) => void createGroup(e)}>

@@ -1583,7 +1583,21 @@ textarea {
   max-width: 40rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.15rem;
+}
+
+.invite-groups-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.35rem 1rem;
+}
+
+.invite-group-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--line);
+  opacity: 0.85;
 }
 
 .invite-create {
@@ -1641,7 +1655,6 @@ textarea {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
 }
 
 .invite-join-list > li {
@@ -1650,12 +1663,11 @@ textarea {
   justify-content: space-between;
   gap: 1rem;
   padding: 0.85rem 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
 }
 
 .invite-join-list > li:last-child {
   border-bottom: none;
-  padding-bottom: 0;
 }
 
 .invite-join-main {
