@@ -281,6 +281,15 @@ export const routes: FastifyPluginAsync = async (app) => {
       return { repos: [], summary: { total: 0, withActivity: 0, idle: 0, errors: 0 } };
     }
 
+    type MemberStat = {
+      githubLogin: string;
+      name: string | null;
+      commitsSinceStart: number;
+      lastCommitAt: string | null;
+      htmlUrl: string;
+      avatarUrl: string;
+    };
+
     type RepoRow = {
       fullName: string;
       htmlUrl: string | null;
@@ -293,6 +302,7 @@ export const routes: FastifyPluginAsync = async (app) => {
       githubOrg: string;
       groupName: string | null;
       students: string[];
+      members: MemberStat[];
       startedAt: string;
       lastCommitAt: string | null;
       lastCommitMessage: string | null;
@@ -301,6 +311,8 @@ export const routes: FastifyPluginAsync = async (app) => {
       hasCommitsSinceStart: boolean;
       error: string | null;
     };
+
+    type PendingMember = { githubLogin: string | null; name: string | null };
 
     const pending: Array<{
       fullName: string;
@@ -312,7 +324,7 @@ export const routes: FastifyPluginAsync = async (app) => {
       orgId: string;
       githubOrg: string;
       groupName: string | null;
-      students: string[];
+      members: PendingMember[];
       startedAt: Date;
       token: string;
     }> = [];
@@ -345,8 +357,10 @@ export const routes: FastifyPluginAsync = async (app) => {
           for (const group of assignment.groups) {
             const members = assignment.enrollments
               .filter((e) => e.groupId === group.id)
-              .map((e) => e.user.githubLogin ?? e.user.name ?? "ukendt")
-              .filter(Boolean) as string[];
+              .map((e) => ({
+                githubLogin: e.user.githubLogin,
+                name: e.user.name,
+              }));
             pending.push({
               fullName: group.githubRepoFullName,
               assignmentId: assignment.id,
@@ -357,7 +371,7 @@ export const routes: FastifyPluginAsync = async (app) => {
               orgId: org.id,
               githubOrg: org.githubOrg,
               groupName: group.name,
-              students: members,
+              members,
               startedAt: group.createdAt,
               token,
             });
@@ -375,8 +389,11 @@ export const routes: FastifyPluginAsync = async (app) => {
               orgId: org.id,
               githubOrg: org.githubOrg,
               groupName: null,
-              students: [
-                enrollment.user.githubLogin ?? enrollment.user.name ?? "ukendt",
+              members: [
+                {
+                  githubLogin: enrollment.user.githubLogin,
+                  name: enrollment.user.name,
+                },
               ],
               startedAt: enrollment.updatedAt,
               token,
@@ -386,7 +403,25 @@ export const routes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    function displayLogin(m: PendingMember): string {
+      return m.githubLogin ?? m.name ?? "ukendt";
+    }
+
+    function emptyMemberStats(members: PendingMember[]): MemberStat[] {
+      return members
+        .filter((m): m is PendingMember & { githubLogin: string } => Boolean(m.githubLogin))
+        .map((m) => ({
+          githubLogin: m.githubLogin,
+          name: m.name,
+          commitsSinceStart: 0,
+          lastCommitAt: null,
+          htmlUrl: `https://github.com/${m.githubLogin}`,
+          avatarUrl: `https://github.com/${m.githubLogin}.png?size=64`,
+        }));
+    }
+
     async function enrich(row: (typeof pending)[number]): Promise<RepoRow> {
+      const students = row.members.map(displayLogin);
       const base: RepoRow = {
         fullName: row.fullName,
         htmlUrl: `https://github.com/${row.fullName}`,
@@ -398,7 +433,8 @@ export const routes: FastifyPluginAsync = async (app) => {
         orgId: row.orgId,
         githubOrg: row.githubOrg,
         groupName: row.groupName,
-        students: row.students,
+        students,
+        members: emptyMemberStats(row.members),
         startedAt: row.startedAt.toISOString(),
         lastCommitAt: null,
         lastCommitMessage: null,
@@ -422,6 +458,34 @@ export const routes: FastifyPluginAsync = async (app) => {
         base.htmlUrl = ghRepo.html_url;
         base.commitsSinceStart = studentCommits.length;
         base.hasCommitsSinceStart = studentCommits.length > 0;
+
+        const byLogin = new Map<
+          string,
+          { count: number; lastCommitAt: string | null }
+        >();
+        for (const m of base.members) {
+          byLogin.set(m.githubLogin.toLowerCase(), { count: 0, lastCommitAt: null });
+        }
+        for (const c of studentCommits) {
+          const login = c.author?.login?.toLowerCase();
+          if (!login || !byLogin.has(login)) continue;
+          const cur = byLogin.get(login)!;
+          cur.count += 1;
+          const at = c.commit.committer?.date ?? c.commit.author?.date ?? null;
+          if (at && (!cur.lastCommitAt || at > cur.lastCommitAt)) {
+            cur.lastCommitAt = at;
+          }
+        }
+        base.members = base.members
+          .map((m) => {
+            const stats = byLogin.get(m.githubLogin.toLowerCase());
+            return {
+              ...m,
+              commitsSinceStart: stats?.count ?? 0,
+              lastCommitAt: stats?.lastCommitAt ?? null,
+            };
+          })
+          .sort((a, b) => b.commitsSinceStart - a.commitsSinceStart);
 
         if (latest) {
           base.lastCommitAt =

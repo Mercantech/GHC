@@ -30,6 +30,13 @@ type DashboardRepo = {
   mode: "individual" | "group";
   groupName: string | null;
   students: string[];
+  members?: Array<{
+    githubLogin: string;
+    commitsSinceStart: number;
+    lastCommitAt: string | null;
+    htmlUrl: string;
+    avatarUrl: string;
+  }>;
   startedAt: string;
   lastCommitAt: string | null;
   lastCommitMessage: string | null;

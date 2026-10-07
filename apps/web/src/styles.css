@@ -1299,6 +1299,57 @@ textarea {
   color: var(--danger);
 }
 
+.dash-member-commits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.dash-member-commits li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.85rem;
+}
+
+.dash-member-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.dash-member-link:hover {
+  text-decoration: none;
+  color: var(--accent);
+}
+
+.dash-member-avatar {
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--paper);
+  flex-shrink: 0;
+}
+
+.dash-member-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.dash-member-ago {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .dash-summary {
     grid-template-columns: 1fr;

@@ -28,6 +28,15 @@ type AssignmentDetail = {
   }>;
 };
 
+type MemberStat = {
+  githubLogin: string;
+  name: string | null;
+  commitsSinceStart: number;
+  lastCommitAt: string | null;
+  htmlUrl: string;
+  avatarUrl: string;
+};
+
 type DashboardRepo = {
   fullName: string;
   htmlUrl: string | null;
@@ -37,6 +46,7 @@ type DashboardRepo = {
   mode: "individual" | "group";
   groupName: string | null;
   students: string[];
+  members: MemberStat[];
   startedAt: string;
   lastCommitAt: string | null;
   lastCommitMessage: string | null;
@@ -141,6 +151,20 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
       return true;
     });
   }, [repos, activityFilter]);
+
+  const commitsByLogin = useMemo(() => {
+    const map = new Map<string, MemberStat>();
+    for (const r of repos) {
+      for (const m of r.members ?? []) {
+        const key = m.githubLogin.toLowerCase();
+        const prev = map.get(key);
+        if (!prev || m.commitsSinceStart > prev.commitsSinceStart) {
+          map.set(key, m);
+        }
+      }
+    }
+    return map;
+  }, [repos]);
 
   async function saveAssignment(e: FormEvent) {
     e.preventDefault();
@@ -361,7 +385,7 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                 <div className="section-head">
                   <div>
                     <h2>Aktivitet</h2>
-                    <p>Repos for denne assignment — sidste commit og aktivitet siden start.</p>
+                    <p>Commits pr. person siden repo-start (initial/template tælles ikke).</p>
                   </div>
                 </div>
 
@@ -377,9 +401,9 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                       <thead>
                         <tr>
                           <th>Repo</th>
-                          <th>Elev / gruppe</th>
+                          <th>Personer</th>
                           <th>Sidste commit</th>
-                          <th>Siden start</th>
+                          <th>I alt</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -397,14 +421,55 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                                   {r.fullName.split("/")[1] ?? r.fullName}
                                 </span>
                               </a>
+                              {r.groupName && (
+                                <div className="muted" style={{ marginTop: "0.25rem" }}>
+                                  {r.groupName}
+                                </div>
+                              )}
                               {r.error && <div className="dash-error">{r.error}</div>}
                             </td>
                             <td>
-                              {r.groupName ? (
-                                <>
-                                  <div className="dash-title">{r.groupName}</div>
-                                  <div className="muted">{r.students.join(", ") || "—"}</div>
-                                </>
+                              {r.members?.length ? (
+                                <ul className="dash-member-commits">
+                                  {r.members.map((m) => (
+                                    <li key={m.githubLogin}>
+                                      <a
+                                        className="dash-member-link"
+                                        href={m.htmlUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        title={m.name ?? `@${m.githubLogin}`}
+                                      >
+                                        <img
+                                          className="dash-member-avatar"
+                                          src={m.avatarUrl}
+                                          alt=""
+                                          width={28}
+                                          height={28}
+                                          loading="lazy"
+                                        />
+                                        <span className="mono">@{m.githubLogin}</span>
+                                      </a>
+                                      <div className="dash-member-stats">
+                                        {m.commitsSinceStart > 0 ? (
+                                          <span className="tag tag-ok">
+                                            {m.commitsSinceStart >= 100
+                                              ? "100+"
+                                              : m.commitsSinceStart}{" "}
+                                            commit{m.commitsSinceStart === 1 ? "" : "s"}
+                                          </span>
+                                        ) : (
+                                          <span className="tag tag-idle">0</span>
+                                        )}
+                                        <span className="muted dash-member-ago">
+                                          {m.lastCommitAt
+                                            ? formatRelativeDa(m.lastCommitAt)
+                                            : "ingen endnu"}
+                                        </span>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
                               ) : (
                                 <span className="mono">@{r.students[0] ?? "—"}</span>
                               )}
@@ -460,7 +525,9 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                   <p className="muted">Ingen tilmeldinger endnu.</p>
                 ) : (
                   <ul className="assignment-list">
-                    {assignment.enrollments.map((e) => (
+                    {assignment.enrollments.map((e) => {
+                      const member = commitsByLogin.get(e.student.toLowerCase());
+                      return (
                       <li key={e.id}>
                         <div className="assignment-main">
                           <div className="row" style={{ gap: "0.5rem", marginBottom: "0.25rem" }}>
@@ -476,10 +543,25 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                             >
                               {statusLabel(e.status)}
                             </span>
+                            {member && (
+                              <span
+                                className={`tag ${
+                                  member.commitsSinceStart > 0 ? "tag-ok" : "tag-idle"
+                                }`}
+                              >
+                                {member.commitsSinceStart >= 100
+                                  ? "100+"
+                                  : member.commitsSinceStart}{" "}
+                                commit{member.commitsSinceStart === 1 ? "" : "s"}
+                              </span>
+                            )}
                           </div>
                           <div className="muted">
                             {e.groupName ? `${e.groupName} · ` : ""}
                             {formatRelativeDa(e.acceptedAt)}
+                            {member?.lastCommitAt
+                              ? ` · sidst ${formatRelativeDa(member.lastCommitAt)}`
+                              : ""}
                           </div>
                           {e.errorMessage && (
                             <div className="dash-error" style={{ marginTop: "0.35rem" }}>
@@ -511,7 +593,8 @@ export function AssignmentDashboardPage({ me }: { me: Me | null }) {
                           </div>
                         )}
                       </li>
-                    ))}
+                    );
+                    })}
                   </ul>
                 )}
               </section>
