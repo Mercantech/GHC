@@ -1581,34 +1581,48 @@ textarea {
 .invite-group {
   animation: inviteIn 0.9s var(--ease) 0.14s both;
   max-width: 40rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
 }
 
-.invite-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
-  margin-bottom: 1.35rem;
-  padding: 0.3rem;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.55);
+.invite-group-section-head {
+  margin-bottom: 1rem;
 }
 
-.invite-tabs button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
+.invite-group-section-head h2 {
+  margin: 0 0 0.25rem;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.invite-group-section-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.invite-group-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  color: var(--muted);
+  font-size: 0.8rem;
   font-weight: 650;
-  padding: 0.75rem 0.85rem;
-  border-radius: 9px;
-  cursor: pointer;
-  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.invite-tabs button.is-active {
-  background: var(--ink);
-  color: #fff;
+.invite-group-divider::before,
+.invite-group-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
 }
 
 .invite-create {
@@ -1726,12 +1740,6 @@ textarea {
 .invite-member-handle {
   font-size: 0.82rem;
   color: var(--ink-soft);
-}
-
-.invite-empty {
-  margin: 0;
-  color: var(--ink-soft);
-  line-height: 1.5;
 }
 
 @keyframes inviteIn {

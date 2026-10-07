@@ -77,8 +77,6 @@ function AssignmentView({
   setError: (v: string | null) => void;
   setBusy: (v: boolean) => void;
 }) {
-  const [groupMode, setGroupMode] = useState<"create" | "join">("create");
-
   async function acceptIndividual() {
     if (!data) return;
     setBusy(true);
@@ -240,7 +238,7 @@ function AssignmentView({
           {failed
             ? "Noget gik galt sidst — prøv igen. Findes repoet allerede, genåbner vi bare din adgang."
             : a.mode === "group"
-              ? "Opret en gruppe eller join en eksisterende — I deler ét repo via GitHub Teams."
+              ? "Join en eksisterende gruppe eller opret en ny — I deler ét repo via GitHub Teams."
               : "Acceptér, så opretter vi et offentligt repo til dig fra template og giver dig write-adgang."}
         </p>
 
@@ -268,29 +266,92 @@ function AssignmentView({
 
         {a.mode === "group" && (
           <div className="invite-group">
-            <div className="invite-tabs" role="tablist" aria-label="Gruppevalg">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={groupMode === "create"}
-                className={groupMode === "create" ? "is-active" : undefined}
-                onClick={() => setGroupMode("create")}
-              >
-                Opret gruppe
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={groupMode === "join"}
-                className={groupMode === "join" ? "is-active" : undefined}
-                onClick={() => setGroupMode("join")}
-              >
-                Join gruppe
-                {a.groups.length > 0 ? ` (${a.groups.length})` : ""}
-              </button>
+            <section className="invite-group-section">
+              <div className="invite-group-section-head">
+                <h2>Join en gruppe</h2>
+                <p>
+                  {a.groups.length === 0
+                    ? "Ingen grupper endnu — opret den første nedenfor."
+                    : `${a.groups.length} gruppe${a.groups.length === 1 ? "" : "r"} · join med dit GitHub-login`}
+                </p>
+              </div>
+
+              {a.groups.length > 0 && (
+                <ul className="invite-join-list">
+                  {a.groups.map((g) => {
+                    const members = g.members?.length ? g.members : [];
+                    const full =
+                      a.maxTeamSize != null && g.memberCount >= a.maxTeamSize;
+                    return (
+                      <li key={g.id}>
+                        <div className="invite-join-main">
+                          <div className="invite-join-head">
+                            <strong>{g.name}</strong>
+                            <span className="invite-join-meta">
+                              {g.memberCount} medlem{g.memberCount === 1 ? "" : "mer"}
+                              {a.maxTeamSize ? ` · max ${a.maxTeamSize}` : ""}
+                            </span>
+                          </div>
+                          {members.length > 0 ? (
+                            <ul className="invite-member-list">
+                              {members.map((m) => (
+                                <li key={m.githubLogin}>
+                                  <a
+                                    className="invite-member"
+                                    href={m.htmlUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title={
+                                      m.name
+                                        ? `${m.name} (@${m.githubLogin})`
+                                        : `@${m.githubLogin}`
+                                    }
+                                  >
+                                    <img
+                                      className="invite-member-avatar"
+                                      src={m.avatarUrl}
+                                      alt=""
+                                      width={28}
+                                      height={28}
+                                      loading="lazy"
+                                    />
+                                    <span className="invite-member-handle mono">
+                                      @{m.githubLogin}
+                                    </span>
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="invite-join-meta">
+                              Ingen GitHub-profiler knyttet endnu.
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          className="btn btn-ghost"
+                          type="button"
+                          disabled={busy || full}
+                          onClick={() => void joinGroup(g.id)}
+                        >
+                          {full ? "Fuld" : "Join"}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <div className="invite-group-divider" aria-hidden="true">
+              <span>eller</span>
             </div>
 
-            {groupMode === "create" ? (
+            <section className="invite-group-section">
+              <div className="invite-group-section-head">
+                <h2>Opret ny gruppe</h2>
+                <p>Du bliver maintainer. Resten af holdet joiner bagefter.</p>
+              </div>
               <form className="invite-create" onSubmit={(e) => void createGroup(e)}>
                 <label className="invite-field">
                   <span>Gruppenavn</span>
@@ -299,82 +360,22 @@ function AssignmentView({
                     onChange={(e) => setGroupName(e.target.value)}
                     placeholder="team-alpha"
                     required
-                    autoFocus
+                    autoFocus={a.groups.length === 0}
                   />
                 </label>
-                <button className="btn btn-github btn-xl" type="submit">
+                <button
+                  className="btn btn-github btn-xl"
+                  type="submit"
+                  disabled={busy}
+                >
                   <GitHubMark size={20} />
                   Opret gruppe + repo
                 </button>
                 <p className="invite-hint">
-                  Du bliver maintainer. Resten af holdet joiner bagefter.
+                  Logger ind som <span className="mono">@{me.githubLogin}</span>
                 </p>
               </form>
-            ) : a.groups.length === 0 ? (
-              <p className="invite-empty">
-                Ingen grupper endnu. Skift til <strong>Opret gruppe</strong> og lav den første.
-              </p>
-            ) : (
-              <ul className="invite-join-list">
-                {a.groups.map((g) => {
-                  const members = g.members?.length
-                    ? g.members
-                    : [];
-                  const full =
-                    a.maxTeamSize != null && g.memberCount >= a.maxTeamSize;
-                  return (
-                    <li key={g.id}>
-                      <div className="invite-join-main">
-                        <div className="invite-join-head">
-                          <strong>{g.name}</strong>
-                          <span className="invite-join-meta">
-                            {g.memberCount} medlem{g.memberCount === 1 ? "" : "mer"}
-                            {a.maxTeamSize ? ` · max ${a.maxTeamSize}` : ""}
-                          </span>
-                        </div>
-                        {members.length > 0 ? (
-                          <ul className="invite-member-list">
-                            {members.map((m) => (
-                              <li key={m.githubLogin}>
-                                <a
-                                  className="invite-member"
-                                  href={m.htmlUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title={m.name ? `${m.name} (@${m.githubLogin})` : `@${m.githubLogin}`}
-                                >
-                                  <img
-                                    className="invite-member-avatar"
-                                    src={m.avatarUrl}
-                                    alt=""
-                                    width={28}
-                                    height={28}
-                                    loading="lazy"
-                                  />
-                                  <span className="invite-member-handle mono">
-                                    @{m.githubLogin}
-                                  </span>
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="invite-join-meta">Ingen GitHub-profiler knyttet endnu.</p>
-                        )}
-                      </div>
-                      <button
-                        className="btn btn-ghost"
-                        type="button"
-                        disabled={busy || full}
-                        onClick={() => void joinGroup(g.id)}
-                      >
-                        {full ? "Fuld" : "Join"}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+            </section>
           </div>
         )}
       </div>
