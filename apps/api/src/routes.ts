@@ -843,6 +843,49 @@ export const routes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send({ assignment });
   });
 
+  const groupInviteSelect = {
+    id: true,
+    name: true,
+    githubRepoFullName: true,
+    createdAt: true,
+    _count: { select: { enrollments: true } },
+    enrollments: {
+      select: {
+        user: { select: { githubLogin: true, name: true } },
+      },
+      orderBy: { createdAt: "asc" as const },
+    },
+  };
+
+  function mapInviteGroups(
+    groups: {
+      id: string;
+      name: string;
+      githubRepoFullName: string;
+      _count: { enrollments: number };
+      enrollments: { user: { githubLogin: string | null; name: string | null } }[];
+    }[],
+  ) {
+    return groups.map((g) => {
+      const members = g.enrollments
+        .map((e) => e.user)
+        .filter((u): u is { githubLogin: string; name: string | null } => Boolean(u.githubLogin))
+        .map((u) => ({
+          githubLogin: u.githubLogin,
+          name: u.name,
+          htmlUrl: `https://github.com/${u.githubLogin}`,
+          avatarUrl: `https://github.com/${u.githubLogin}.png?size=80`,
+        }));
+      return {
+        id: g.id,
+        name: g.name,
+        repo: g.githubRepoFullName,
+        memberCount: g._count.enrollments,
+        members,
+      };
+    });
+  }
+
   app.get("/assignments/by-invite/:token", async (request, reply) => {
     const { token } = request.params as { token: string };
     const assignment = await prisma.assignment.findUnique({
@@ -850,12 +893,7 @@ export const routes: FastifyPluginAsync = async (app) => {
       include: {
         org: { select: { name: true, githubOrg: true } },
         groups: {
-          select: {
-            id: true,
-            name: true,
-            githubRepoFullName: true,
-            _count: { select: { enrollments: true } },
-          },
+          select: groupInviteSelect,
           orderBy: { createdAt: "asc" },
         },
       },
@@ -880,12 +918,7 @@ export const routes: FastifyPluginAsync = async (app) => {
         templateRepo: assignment.templateRepo,
         maxTeamSize: assignment.maxTeamSize,
         org: assignment.org,
-        groups: assignment.groups.map((g) => ({
-          id: g.id,
-          name: g.name,
-          repo: g.githubRepoFullName,
-          memberCount: g._count.enrollments,
-        })),
+        groups: mapInviteGroups(assignment.groups),
       },
       enrollment: myEnrollment,
     };
@@ -898,12 +931,8 @@ export const routes: FastifyPluginAsync = async (app) => {
       include: {
         org: { select: { name: true, githubOrg: true } },
         groups: {
-          select: {
-            id: true,
-            name: true,
-            githubRepoFullName: true,
-            _count: { select: { enrollments: true } },
-          },
+          select: groupInviteSelect,
+          orderBy: { createdAt: "asc" },
         },
       },
     });
@@ -932,12 +961,7 @@ export const routes: FastifyPluginAsync = async (app) => {
         templateRepo: assignment.templateRepo,
         maxTeamSize: assignment.maxTeamSize,
         org: assignment.org,
-        groups: assignment.groups.map((g) => ({
-          id: g.id,
-          name: g.name,
-          repo: g.githubRepoFullName,
-          memberCount: g._count.enrollments,
-        })),
+        groups: mapInviteGroups(assignment.groups),
       },
       enrollment: myEnrollment,
     };

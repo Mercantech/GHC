@@ -4,7 +4,19 @@ import { api } from "../api";
 import { Layout, RequireAuth, type Me } from "../components";
 import { GitHubMark } from "../icons";
 
-type Group = { id: string; name: string; repo: string; memberCount: number };
+type GroupMember = {
+  githubLogin: string;
+  name: string | null;
+  htmlUrl: string;
+  avatarUrl: string;
+};
+type Group = {
+  id: string;
+  name: string;
+  repo: string;
+  memberCount: number;
+  members: GroupMember[];
+};
 type Enrollment = {
   id: string;
   status: string;
@@ -304,24 +316,63 @@ function AssignmentView({
               </p>
             ) : (
               <ul className="invite-join-list">
-                {a.groups.map((g) => (
-                  <li key={g.id}>
-                    <div>
-                      <strong>{g.name}</strong>
-                      <span>
-                        {g.memberCount} medlem{g.memberCount === 1 ? "" : "mer"}
-                        {a.maxTeamSize ? ` · max ${a.maxTeamSize}` : ""}
-                      </span>
-                    </div>
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      onClick={() => void joinGroup(g.id)}
-                    >
-                      Join
-                    </button>
-                  </li>
-                ))}
+                {a.groups.map((g) => {
+                  const members = g.members?.length
+                    ? g.members
+                    : [];
+                  const full =
+                    a.maxTeamSize != null && g.memberCount >= a.maxTeamSize;
+                  return (
+                    <li key={g.id}>
+                      <div className="invite-join-main">
+                        <div className="invite-join-head">
+                          <strong>{g.name}</strong>
+                          <span className="invite-join-meta">
+                            {g.memberCount} medlem{g.memberCount === 1 ? "" : "mer"}
+                            {a.maxTeamSize ? ` · max ${a.maxTeamSize}` : ""}
+                          </span>
+                        </div>
+                        {members.length > 0 ? (
+                          <ul className="invite-member-list">
+                            {members.map((m) => (
+                              <li key={m.githubLogin}>
+                                <a
+                                  className="invite-member"
+                                  href={m.htmlUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={m.name ? `${m.name} (@${m.githubLogin})` : `@${m.githubLogin}`}
+                                >
+                                  <img
+                                    className="invite-member-avatar"
+                                    src={m.avatarUrl}
+                                    alt=""
+                                    width={28}
+                                    height={28}
+                                    loading="lazy"
+                                  />
+                                  <span className="invite-member-handle mono">
+                                    @{m.githubLogin}
+                                  </span>
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="invite-join-meta">Ingen GitHub-profiler knyttet endnu.</p>
+                        )}
+                      </div>
+                      <button
+                        className="btn btn-ghost"
+                        type="button"
+                        disabled={busy || full}
+                        onClick={() => void joinGroup(g.id)}
+                      >
+                        {full ? "Fuld" : "Join"}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>

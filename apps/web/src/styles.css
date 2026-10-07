@@ -1529,7 +1529,7 @@ textarea {
 
 .invite-group {
   animation: inviteIn 0.9s var(--ease) 0.14s both;
-  max-width: 34rem;
+  max-width: 40rem;
 }
 
 .invite-tabs {
@@ -1606,25 +1606,75 @@ textarea {
   border-top: 1px solid var(--line);
 }
 
-.invite-join-list li {
+.invite-join-list > li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 0;
+  padding: 1.05rem 0;
   border-bottom: 1px solid var(--line);
 }
 
-.invite-join-list strong {
+.invite-join-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.invite-join-head strong {
   display: block;
   font-size: 1.05rem;
   letter-spacing: -0.02em;
   margin-bottom: 0.15rem;
 }
 
-.invite-join-list span {
+.invite-join-meta {
+  margin: 0;
   color: var(--muted);
   font-size: 0.88rem;
+}
+
+.invite-member-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.invite-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.55rem 0.28rem 0.28rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.invite-member:hover {
+  text-decoration: none;
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: #fff;
+}
+
+.invite-member-avatar {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--paper);
+}
+
+.invite-member-handle {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
 }
 
 .invite-empty {
