@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
 import { beginLogin, isLoggedIn } from "../auth";
@@ -115,20 +115,51 @@ export function HomePage({
     return (
       <Layout landing>
         <div className="landing">
-          <div className="landing-visual" aria-hidden="true" />
+          <div className="landing-atmosphere" aria-hidden="true">
+            <div className="landing-glow landing-glow-a" />
+            <div className="landing-glow landing-glow-b" />
+            <div className="landing-grid" />
+          </div>
+
           <section className="landing-hero">
-            <h1 className="landing-brand">
-              G<span>HC</span>
-            </h1>
-            <p className="landing-copy">
-              Opret GitHub-opgaver fra templates, del et invite-link, og saml elever i repos —
-              individuelt eller i grupper.
-            </p>
-            <div className="landing-cta">
-              <button type="button" className="btn btn-github" onClick={() => void beginLogin()}>
-                <GitHubMark size={18} />
-                Log ind med Mercantec Auth
-              </button>
+            <div className="landing-copy-block">
+              <h1 className="landing-brand">
+                G<span>HC</span>
+              </h1>
+              <p className="landing-headline">Opgaver direkte i jeres GitHub-org.</p>
+              <p className="landing-lead">
+                Template in, elev-repos out — del et invite-link, og GHC opretter repos med write-adgang.
+              </p>
+              <div className="landing-cta">
+                <button type="button" className="btn btn-github btn-xl" onClick={() => void beginLogin()}>
+                  <GitHubMark size={20} />
+                  Log ind med Mercantec Auth
+                </button>
+              </div>
+            </div>
+
+            <div className="landing-visual" aria-hidden="true">
+              <div className="landing-visual-frame">
+                <div className="landing-repo landing-repo-template">
+                  <span className="landing-repo-label">template</span>
+                  <strong className="mono">Mercantech/intro-git</strong>
+                </div>
+                <div className="landing-flow-line" />
+                <div className="landing-repo-stack">
+                  <div className="landing-repo landing-repo-student" style={{ "--i": 0 } as CSSProperties}>
+                    <span className="landing-repo-label">elev</span>
+                    <strong className="mono">Mercantec-GHC/intro-anna</strong>
+                  </div>
+                  <div className="landing-repo landing-repo-student" style={{ "--i": 1 } as CSSProperties}>
+                    <span className="landing-repo-label">elev</span>
+                    <strong className="mono">Mercantec-GHC/intro-marcus</strong>
+                  </div>
+                  <div className="landing-repo landing-repo-student" style={{ "--i": 2 } as CSSProperties}>
+                    <span className="landing-repo-label">gruppe</span>
+                    <strong className="mono">Mercantec-GHC/intro-team-alpha</strong>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         </div>

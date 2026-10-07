@@ -93,13 +93,19 @@ export function Layout({
 }) {
   return (
     <div className={landing ? "shell shell-landing" : "shell"}>
-      <header className="topbar">
-        <Link to="/" className="brand">
-          <span className="brand-mark">
-            <GitHubMark size={16} />
+      <header className={`topbar${landing ? " topbar-landing" : ""}`}>
+        {landing ? (
+          <span className="landing-top-mark" aria-hidden="true">
+            G
           </span>
-          G<em>HC</em>
-        </Link>
+        ) : (
+          <Link to="/" className="brand">
+            <span className="brand-mark">
+              <GitHubMark size={16} />
+            </span>
+            G<em>HC</em>
+          </Link>
+        )}
         <div className="row">
           {me && (
             <div className="user-chip">
@@ -116,12 +122,10 @@ export function Layout({
               Log ud
             </button>
           ) : (
-            !landing && (
-              <button type="button" className="btn btn-github btn-sm" onClick={() => void beginLogin()}>
-                <GitHubMark size={14} />
-                Log ind
-              </button>
-            )
+            <button type="button" className="btn btn-github btn-sm" onClick={() => void beginLogin()}>
+              <GitHubMark size={14} />
+              Log ind
+            </button>
           )}
         </div>
       </header>
